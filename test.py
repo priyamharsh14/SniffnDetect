@@ -6,6 +6,7 @@ from ipaddress import *
 
 mac_table = {}
 tcp_syn_activities = []
+tcp_synack_activities = []
 icmp_pod_activities = []
 icmp_smurf_activities = []
 
@@ -35,11 +36,6 @@ def analyze(pkt):
 		src_port = pkt[0][TCP].sport
 		dst_port = pkt[0][TCP].dport
 		tcp_flags = p[0][TCP].flags.flagrepr()
-		
-		''' SYN FLOOD PACKET DETECTOR
-		if tcp_flags == "S" and dst_ip == my_ip:
-			pkt[0]
-		'''
 	
 	if UDP in pkt[0]:
 		protocol.append("UDP")
@@ -48,7 +44,7 @@ def analyze(pkt):
 	
 	if ICMP in pkt[0]:
 		protocol.append("ICMP")
-		icmp_type = pkt[0][ICMP].type
+		icmp_type = pkt[0][ICMP].type # 8 for echo-request and 0 for echo-reply
 	
 	if Raw in pkt[0]:
 		load_data = pkt[0][Raw].load
@@ -60,7 +56,13 @@ def analyze(pkt):
 			mac_table[pkt[0][ARP].hwsrc] = pkt[0][ARP].psrc
 
 	if src_ip == my_ip and src_mac != my_mac and ICMP in pkt[0]:
-		print("[i] ICMP smurf attack packet detected !!")
+		icmp_smurf_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_data, load_len])
+	if ICMP in pkt[0] and load_len>10240:
+		icmp_pod_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_data, load_len])
+	if TCP in pkt[0] and tcp_flags == "S" and dst_ip == my_ip:
+		tcp_syn_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_data, load_len])
+	if TCP in pkt[0] and tcp_flags == "SA" and dst_ip == my_ip:
+		tcp_synack_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_data, load_len])
 
 n = 10
 
