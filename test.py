@@ -5,6 +5,9 @@ from scapy.all import *
 from ipaddress import *
 
 mac_table = {}
+tcp_syn_activities = []
+icmp_pod_activities = []
+icmp_smurf_activities = []
 
 def clear_screen():
 	if "linux" in sys.platform:
@@ -16,7 +19,8 @@ def clear_screen():
 
 def analyze(pkt):
 	global mac_table
-	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, flags, icmp_type, load_data, load_len = None, None, None, None, None, None, None, None, None, None
+	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_data, load_len = None, None, None, None, None, None, None, None, None, None
+	protocol = []
 	
 	if Ether in pkt[0]:
 		src_mac = pkt[0][Ether].src
@@ -27,33 +31,36 @@ def analyze(pkt):
 		dst_ip = pkt[0][IP].dst
 	
 	if TCP in pkt[0]:
+		protocol.append("TCP")
 		src_port = pkt[0][TCP].sport
 		dst_port = pkt[0][TCP].dport
-		flags = p[0][TCP].flags.flagrepr()
+		tcp_flags = p[0][TCP].flags.flagrepr()
 		
 		''' SYN FLOOD PACKET DETECTOR
-		if flags == "S" and dst_ip == my_ip:
+		if tcp_flags == "S" and dst_ip == my_ip:
 			pkt[0]
 		'''
 	
 	if UDP in pkt[0]:
+		protocol.append("UDP")
 		src_port = pkt[0][UDP].sport
 		dst_port = pkt[0][UDP].dport
 	
 	if ICMP in pkt[0]:
+		protocol.append("ICMP")
 		icmp_type = pkt[0][ICMP].type
-		
-		if src_ip == my_ip and src_mac != my_mac:
-			print("[i] ICMP smurf attack packet detected !!")
-
 	
 	if Raw in pkt[0]:
 		load_data = pkt[0][Raw].load
 		load_len = len(pkt[0][Raw].load)
 
 	if ARP in pkt[0] and pkt[0][ARP].op in (1,2):
+		protocol.append("ARP")
 		if pkt[0][ARP].hwsrc not in mac_table.keys():
 			mac_table[pkt[0][ARP].hwsrc] = pkt[0][ARP].psrc
+
+	if src_ip == my_ip and src_mac != my_mac and ICMP in pkt[0]:
+		print("[i] ICMP smurf attack packet detected !!")
 
 n = 10
 
