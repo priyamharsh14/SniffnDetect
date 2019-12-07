@@ -5,10 +5,20 @@ from scapy.all import *
 from ipaddress import *
 
 mac_table = {}
+recent_activities = []
 tcp_syn_activities = []
 tcp_synack_activities = []
 icmp_pod_activities = []
 icmp_smurf_activities = []
+icmp_pod_flag = [False, None]
+icmp_smurf_flag = [False, None]
+syn_flood_flag = [False, None]
+synack_flood_flag = [False, None]
+banner = '''
+-----------------------
+SniffnDetect v.1.0alpha
+-----------------------
+'''
 
 def clear_screen():
 	if "linux" in sys.platform:
@@ -18,11 +28,32 @@ def clear_screen():
 	else:
 		pass
 
+def display():
+	clear_screen()
+	print(banner)
+	print()
+
 def analyze(pkt):
 	global mac_table
+	global recent_activities
 	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_data, load_len = None, None, None, None, None, None, None, None, None, None
 	protocol = []
 	
+	if len(recent_activities)>5:
+		recent_activities = recent_activities[-5:]
+
+	if len(tcp_syn_activities)>5:
+		tcp_syn_activities = tcp_syn_activities[-5:]
+
+	if len(tcp_synack_activities)>5:
+		tcp_synack_activities = tcp_synack_activities[-5:]
+
+	if len(icmp_pod_activities)>5:
+		icmp_pod_activities = icmp_pod_activities[-5:]
+
+	if len(icmp_smurf_activities)>5:
+		icmp_smurf_activities = icmp_smurf_activities[-5:]
+
 	if Ether in pkt[0]:
 		src_mac = pkt[0][Ether].src
 		dst_mac = pkt[0][Ether].dst
@@ -46,23 +77,26 @@ def analyze(pkt):
 		protocol.append("ICMP")
 		icmp_type = pkt[0][ICMP].type # 8 for echo-request and 0 for echo-reply
 	
-	if Raw in pkt[0]:
-		load_data = pkt[0][Raw].load
-		load_len = len(pkt[0][Raw].load)
-
 	if ARP in pkt[0] and pkt[0][ARP].op in (1,2):
 		protocol.append("ARP")
 		if pkt[0][ARP].hwsrc not in mac_table.keys():
 			mac_table[pkt[0][ARP].hwsrc] = pkt[0][ARP].psrc
 
+	if Raw in pkt[0]:
+		load_data = pkt[0][Raw].load
+		load_len = len(pkt[0][Raw].load)
+
 	if src_ip == my_ip and src_mac != my_mac and ICMP in pkt[0]:
 		icmp_smurf_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_data, load_len])
-	if ICMP in pkt[0] and load_len>10240:
+	if ICMP in pkt[0] and load_len>65535:
 		icmp_pod_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_data, load_len])
 	if TCP in pkt[0] and tcp_flags == "S" and dst_ip == my_ip:
 		tcp_syn_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_data, load_len])
 	if TCP in pkt[0] and tcp_flags == "SA" and dst_ip == my_ip:
 		tcp_synack_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_data, load_len])
+
+	recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_data, load_len])
+	display()
 
 n = 10
 
@@ -73,7 +107,11 @@ for x in conf.route.routes:
 	if x[3]==interface and x[4]==my_ip and x[2]=='0.0.0.0' and IPv4Address(x[1]).compressed.startswith("255.") and IPv4Address(x[0]).compressed.startswith(my_ip.split(".")[0]) and IPv4Address(x[0]).compressed.endswith(".0"):
 		netmask = IPv4Address(x[1]).compressed
 
-print("[+] Starting sniffing module.. [For {} seconds]".format(n))
+print("[+] Starting sniffing module..")
+print("[+] DEBUG: Current Interface =",interface)
+print("[+] DEBUG: Current IP =",my_ip)
+print("[+] DEBUG: Current Subnet Mask =",netmask)
+print("[+] DEBUG: Current MAC = {}\n".format(my_mac))
 print("[+] Started sniffing module at {}\n".format(str(datetime.now()).split(".")[0]))
 start = time.time()
 while True:
