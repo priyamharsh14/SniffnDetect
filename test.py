@@ -4,22 +4,6 @@ import datetime
 from scapy.all import *
 from ipaddress import *
 
-mac_table = {}
-recent_activities = []
-tcp_syn_activities = []
-tcp_synack_activities = []
-icmp_pod_activities = []
-icmp_smurf_activities = []
-icmp_pod_flag = [False, None]
-icmp_smurf_flag = [False, None]
-syn_flood_flag = [False, None]
-synack_flood_flag = [False, None]
-banner = '''
------------------------
-SniffnDetect v.1.0alpha
------------------------
-'''
-
 def clear_screen():
 	if "linux" in sys.platform:
 		os.system("clear")
@@ -29,13 +13,22 @@ def clear_screen():
 		pass
 
 def display():
+	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
+	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
 	clear_screen()
 	print(banner)
-	print()
+	print("[+] Current Interface =",interface)
+	print("[+] Current IP =",my_ip)
+	print("[+] Current Subnet Mask =",netmask)
+	print("[+] Current MAC = {}\n".format(my_mac))
+	print("[+] Recent Activities:\n")
+	for i in recent_activities[::-1]:
+		msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+") ["+str(i[8])+" bytes]"
+		print(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(i[0])), msg)
 
 def analyze(pkt):
-	global mac_table
-	global recent_activities
+	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
+	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
 	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_data, load_len = None, None, None, None, None, None, None, None, None, None
 	protocol = []
 	
@@ -66,7 +59,7 @@ def analyze(pkt):
 		protocol.append("TCP")
 		src_port = pkt[0][TCP].sport
 		dst_port = pkt[0][TCP].dport
-		tcp_flags = p[0][TCP].flags.flagrepr()
+		tcp_flags = pkt[0][TCP].flags.flagrepr()
 	
 	if UDP in pkt[0]:
 		protocol.append("UDP")
@@ -95,8 +88,24 @@ def analyze(pkt):
 	if TCP in pkt[0] and tcp_flags == "SA" and dst_ip == my_ip:
 		tcp_synack_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_data, load_len])
 
-	recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_data, load_len])
+	recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len])
 	display()
+
+mac_table = {}
+recent_activities = []
+tcp_syn_activities = []
+tcp_synack_activities = []
+icmp_pod_activities = []
+icmp_smurf_activities = []
+icmp_pod_flag = [False, None]
+icmp_smurf_flag = [False, None]
+syn_flood_flag = [False, None]
+synack_flood_flag = [False, None]
+banner = '''
+-----------------------
+SniffnDetect v.1.0alpha
+-----------------------
+'''
 
 n = 10
 
@@ -108,10 +117,6 @@ for x in conf.route.routes:
 		netmask = IPv4Address(x[1]).compressed
 
 print("[+] Starting sniffing module..")
-print("[+] DEBUG: Current Interface =",interface)
-print("[+] DEBUG: Current IP =",my_ip)
-print("[+] DEBUG: Current Subnet Mask =",netmask)
-print("[+] DEBUG: Current MAC = {}\n".format(my_mac))
 print("[+] Started sniffing module at {}\n".format(str(datetime.now()).split(".")[0]))
 start = time.time()
 while True:
@@ -120,5 +125,5 @@ while True:
 		assert time.time() - start < n
 	except AssertionError:
 		sys.exit("[i] Time's up. Thank you !!")
-	except:
-		sys.exit("[-] There was some unknown error. Shutting Down.")
+#	except:
+#		sys.exit("[-] There was some unknown error. Shutting Down.")
