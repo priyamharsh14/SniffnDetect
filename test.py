@@ -23,29 +23,39 @@ def display():
 	print("[+] Current MAC = {}\n".format(my_mac))
 	print("[+] Recent Activities:\n")
 	for i in recent_activities[::-1]:
-		msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+") ["+str(i[8])+" bytes]"
-		print(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(i[0])), msg)
+		if i[8]:
+			msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+") ["+str(i[8])+" bytes]"
+		else:
+			msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+")"
+		if i[9]:
+			print(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(i[0])), msg, i[9])
+		else:
+			print(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(i[0])), msg)
+	print("\n[+] ICMP Smurf Attack:\t {} - [{} packet(s)]".format(icmp_smurf_flag[0], len(icmp_smurf_activities)))
+	print("[+] Ping of Death:\t {} - [{} packet(s)]".format(icmp_pod_flag[0], len(icmp_pod_activities)))
+	print("[+] TCP SYN Flood:\t {} - [{} packet(s)]".format(syn_flood_flag[0], len(tcp_syn_activities)))
+	print("[+] TCP SYN-ACK Flood:\t {} - [{} packet(s)]".format(synack_flood_flag[0], len(tcp_synack_activities)))
 
 def analyze(pkt):
 	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
 	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
-	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_data, load_len = None, None, None, None, None, None, None, None, None, None
+	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_len = None, None, None, None, None, None, None, None, None
 	protocol = []
 	
 	if len(recent_activities)>5:
 		recent_activities = recent_activities[-5:]
 
-	if len(tcp_syn_activities)>5:
-		tcp_syn_activities = tcp_syn_activities[-5:]
+	if len(tcp_syn_activities)>2:
+		syn_flood_flag[0] = True
 
-	if len(tcp_synack_activities)>5:
-		tcp_synack_activities = tcp_synack_activities[-5:]
+	if len(tcp_synack_activities)>2:
+		synack_flood_flag[0] = True
 
-	if len(icmp_pod_activities)>5:
-		icmp_pod_activities = icmp_pod_activities[-5:]
+	if len(icmp_pod_activities)>2:
+		icmp_pod_flag[0] = True
 
-	if len(icmp_smurf_activities)>5:
-		icmp_smurf_activities = icmp_smurf_activities[-5:]
+	if len(icmp_smurf_activities)>2:
+		icmp_smurf_flag[0] = True
 
 	if Ether in pkt[0]:
 		src_mac = pkt[0][Ether].src
@@ -76,19 +86,23 @@ def analyze(pkt):
 			mac_table[pkt[0][ARP].hwsrc] = pkt[0][ARP].psrc
 
 	if Raw in pkt[0]:
-		load_data = pkt[0][Raw].load
+#		load_data = pkt[0][Raw].load
 		load_len = len(pkt[0][Raw].load)
 
 	if src_ip == my_ip and src_mac != my_mac and ICMP in pkt[0]:
-		icmp_smurf_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_data, load_len])
+		icmp_smurf_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
+		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<ICMP SMURF PACKET>"])
 	if ICMP in pkt[0] and load_len>65535:
-		icmp_pod_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_data, load_len])
+		icmp_pod_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
+		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<PING OF DEATH PACKET>"])
 	if TCP in pkt[0] and tcp_flags == "S" and dst_ip == my_ip:
-		tcp_syn_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_data, load_len])
+		tcp_syn_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
+		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN PACKET>"])
 	if TCP in pkt[0] and tcp_flags == "SA" and dst_ip == my_ip:
-		tcp_synack_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_data, load_len])
+		tcp_synack_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
+		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN-ACK PACKET>"])
+	recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, None])
 
-	recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len])
 	display()
 
 mac_table = {}
@@ -121,9 +135,9 @@ print("[+] Started sniffing module at {}\n".format(str(datetime.now()).split("."
 start = time.time()
 while True:
 	try:
-		sniff(count=1, prn=analyze)
 		assert time.time() - start < n
+		sniff(count=1, prn=analyze)
 	except AssertionError:
-		sys.exit("[i] Time's up. Thank you !!")
+		sys.exit("\n[i] Time's up. Thank you !!")
 #	except:
 #		sys.exit("[-] There was some unknown error. Shutting Down.")
