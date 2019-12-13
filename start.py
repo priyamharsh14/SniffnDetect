@@ -166,7 +166,7 @@ def analyze(pkt):
 n = 60
 clear_screen()
 if not is_admin():
-	print("\t\tPlease Execute With Admin or sudo rights\nExiting")
+	print("[-] Please execute the script with Admin or root rights\n[-] Exiting..")
 	sys.exit(0)
 interface = conf.iface
 my_ip = [x[4] for x in conf.route.routes if x[2] != '0.0.0.0' and x[3]==interface][0]
