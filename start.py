@@ -1,6 +1,7 @@
 import os
 import sys
-import datetime
+import ctypes
+from datetime import datetime
 from scapy.all import *
 from ipaddress import *
 
@@ -50,7 +51,16 @@ def set_flag(activities):
 		if temp_flag[0]:
 			temp_flag[1] = list(set([i[3] for i in activities]))
 	return temp_flag
-
+	
+def is_admin():
+	try:
+		return os.getuid() == 0
+	except AttributeError:
+		pass
+	try:
+		return ctypes.windll.shell32.IsUserAnAdmin() == 1
+	except AttributeError:
+		return False
 def display():
 	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
 	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
@@ -154,7 +164,10 @@ def analyze(pkt):
 
 #Time in Seconds To Run
 n = 60
-
+clear_screen()
+if not is_admin():
+	print("\t\tPlease Execute With Admin or sudo rights\nExiting")
+	sys.exit(0)
 interface = conf.iface
 my_ip = [x[4] for x in conf.route.routes if x[2] != '0.0.0.0' and x[3]==interface][0]
 my_mac = get_if_hwaddr(interface)
