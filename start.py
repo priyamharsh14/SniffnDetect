@@ -61,6 +61,7 @@ def is_admin():
 		return ctypes.windll.shell32.IsUserAnAdmin() == 1
 	except AttributeError:
 		return False
+		
 def display():
 	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
 	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
