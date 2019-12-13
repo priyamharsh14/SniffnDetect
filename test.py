@@ -28,14 +28,20 @@ def clear_screen():
 		pass
 
 def find_attackers(mac_data):
-	return " ".join(mac_data) # incomplete
+	msg = []
+	for mac in mac_data:
+		if mac in mac_table.keys():
+			msg.append("["+str(mac_table[mac])+" ("+mac+")]")
+		else:
+			msg.append("[Unknown IP ("+mac+")]")
+	return " ".join(msg)
 
 def check_avg_time(activities):
 	time = []
 	for i in range(len(activities)-1,len(activities)-21,-1):
 		time.append(activities[i][0]-activities[i-1][0])
 	time = sum(time)/len(activities)
-	if time<1 and recent_activities[-1][0] - activities[-1][0]<5:
+	if time<2 and recent_activities[-1][0] - activities[-1][0]<5:
 		return True
 	else:
 		return False
@@ -76,13 +82,13 @@ def display():
 		for i in enumerate([icmp_pod_flag, icmp_smurf_flag, synack_flood_flag, syn_flood_flag]):
 			if i[1][0]:
 				if i[0] == 0:
-					print("[+] Ping of Death Attacker(s): ", find_attackers(i[1][1]))
+					print("Ping of Death Attacker(s): ", find_attackers(i[1][1]))
 				elif i[0] == 1:
-					print("[+] ICMP Smurf Attacker(s): ", find_attackers(i[1][1]))
+					print("ICMP Smurf Attacker(s): ", find_attackers(i[1][1]))
 				elif i[0] == 2:
-					print("[+] SYN-ACK Flood Attacker(s): ", find_attackers(i[1][1]))
+					print("SYN-ACK Flood Attacker(s): ", find_attackers(i[1][1]))
 				elif i[0] == 3:
-					print("[+] SYN Flood Attacker(s): ", find_attackers(i[1][1]))
+					print("SYN Flood Attacker(s): ", find_attackers(i[1][1]))
 		print()
 
 def analyze(pkt):
@@ -124,6 +130,8 @@ def analyze(pkt):
 	
 	if ARP in pkt[0] and pkt[0][ARP].op in (1,2):
 		protocol.append("ARP")
+		if pkt[0][ARP].hwsrc in mac_table.keys() and mac_table[pkt[0][ARP].hwsrc] != pkt[0][ARP].psrc:
+			mac_table[pkt[0][ARP].hwsrc] = pkt[0][ARP].psrc
 		if pkt[0][ARP].hwsrc not in mac_table.keys():
 			mac_table[pkt[0][ARP].hwsrc] = pkt[0][ARP].psrc
 
@@ -162,7 +170,6 @@ while True:
 	try:
 		assert time.time() - start < n
 		sniff(count=1, prn=analyze)
-		print("[i] {} seconds remaining..".format(int(n - (time.time() - start))))
 	except AssertionError:
 		sys.exit("[i] Time's up. Thank you !!")
 #	except:
