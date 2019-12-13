@@ -4,6 +4,21 @@ import datetime
 from scapy.all import *
 from ipaddress import *
 
+mac_table = {}
+recent_activities = []
+tcp_syn_activities = []
+tcp_synack_activities = []
+icmp_pod_activities = []
+icmp_smurf_activities = []
+icmp_pod_flag = [False, []]
+icmp_smurf_flag = [False, []]
+syn_flood_flag = [False, []]
+synack_flood_flag = [False, []]
+banner = '''-----------------------
+SniffnDetect v.1.0alpha
+-----------------------
+'''
+
 def clear_screen():
 	if "linux" in sys.platform:
 		os.system("clear")
@@ -12,29 +27,63 @@ def clear_screen():
 	else:
 		pass
 
+def find_attackers(mac_data):
+	return " ".join(mac_data) # incomplete
+
+def check_avg_time(activities):
+	time = []
+	for i in range(len(activities)-1,len(activities)-21,-1):
+		time.append(activities[i][0]-activities[i-1][0])
+	time = sum(time)/len(activities)
+	if time<1 and recent_activities[-1][0] - activities[-1][0]<5:
+		return True
+	else:
+		return False
+
+def set_flag(activities):
+	temp_flag = [False,None]
+	if len(activities)>20:
+		temp_flag[0] = check_avg_time(activities)
+		if temp_flag[0]:
+			temp_flag[1] = list(set([i[3] for i in activities]))
+	return temp_flag
+
 def display():
 	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
 	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
 	clear_screen()
 	print(banner)
-	print("[+] Current Interface =",interface)
-	print("[+] Current IP =",my_ip)
-	print("[+] Current Subnet Mask =",netmask)
-	print("[+] Current MAC = {}\n".format(my_mac))
-	print("[+] Recent Activities:\n")
+	print("[i] Current Interface =",interface)
+	print("[i] Current IP =",my_ip)
+	print("[i] Current Subnet Mask =",netmask)
+	print("[i] Current MAC = {}\n".format(my_mac))
+	print("[i] Recent Activities:\n")
 	for i in recent_activities[::-1]:
 		if i[8]:
 			msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+") ["+str(i[8])+" bytes]"
 		else:
 			msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+")"
 		if i[9]:
-			print(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(i[0])), msg, i[9])
+			print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg, i[9])
 		else:
-			print(time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(i[0])), msg)
-	print("\n[+] ICMP Smurf Attack:\t {} - [{} packet(s)]".format(icmp_smurf_flag[0], len(icmp_smurf_activities)))
-	print("[+] Ping of Death:\t {} - [{} packet(s)]".format(icmp_pod_flag[0], len(icmp_pod_activities)))
-	print("[+] TCP SYN Flood:\t {} - [{} packet(s)]".format(syn_flood_flag[0], len(tcp_syn_activities)))
-	print("[+] TCP SYN-ACK Flood:\t {} - [{} packet(s)]".format(synack_flood_flag[0], len(tcp_synack_activities)))
+			print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg)
+	print("\n[i] ICMP Smurf Attack:\t {} - [{} packet(s)]".format(icmp_smurf_flag[0], len(icmp_smurf_activities)))
+	print("[i] Ping of Death:\t {} - [{} packet(s)]".format(icmp_pod_flag[0], len(icmp_pod_activities)))
+	print("[i] TCP SYN Flood:\t {} - [{} packet(s)]".format(syn_flood_flag[0], len(tcp_syn_activities)))
+	print("[i] TCP SYN-ACK Flood:\t {} - [{} packet(s)]\n".format(synack_flood_flag[0], len(tcp_synack_activities)))
+	if any([icmp_pod_flag[0], icmp_smurf_flag[0], synack_flood_flag[0], syn_flood_flag[0]]):
+		print("[i] Potential Attacker(s):\n")
+		for i in enumerate([icmp_pod_flag, icmp_smurf_flag, synack_flood_flag, syn_flood_flag]):
+			if i[1][0]:
+				if i[0] == 0:
+					print("[+] Ping of Death Attacker(s): ", find_attackers(i[1][1]))
+				elif i[0] == 1:
+					print("[+] ICMP Smurf Attacker(s): ", find_attackers(i[1][1]))
+				elif i[0] == 2:
+					print("[+] SYN-ACK Flood Attacker(s): ", find_attackers(i[1][1]))
+				elif i[0] == 3:
+					print("[+] SYN Flood Attacker(s): ", find_attackers(i[1][1]))
+		print()
 
 def analyze(pkt):
 	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
@@ -45,17 +94,10 @@ def analyze(pkt):
 	if len(recent_activities)>5:
 		recent_activities = recent_activities[-5:]
 
-	if len(tcp_syn_activities)>2:
-		syn_flood_flag[0] = True
-
-	if len(tcp_synack_activities)>2:
-		synack_flood_flag[0] = True
-
-	if len(icmp_pod_activities)>2:
-		icmp_pod_flag[0] = True
-
-	if len(icmp_smurf_activities)>2:
-		icmp_smurf_flag[0] = True
+	syn_flood_flag = set_flag(tcp_syn_activities)
+	synack_flood_flag = set_flag(tcp_synack_activities)
+	icmp_pod_flag = set_flag(icmp_pod_activities)
+	icmp_smurf_flag = set_flag(icmp_smurf_activities)
 
 	if Ether in pkt[0]:
 		src_mac = pkt[0][Ether].src
@@ -92,7 +134,7 @@ def analyze(pkt):
 	if src_ip == my_ip and src_mac != my_mac and ICMP in pkt[0]:
 		icmp_smurf_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
 		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<ICMP SMURF PACKET>"])
-	if ICMP in pkt[0] and load_len>65535:
+	if ICMP in pkt[0] and load_len>1024:
 		icmp_pod_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
 		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<PING OF DEATH PACKET>"])
 	if TCP in pkt[0] and tcp_flags == "S" and dst_ip == my_ip:
@@ -105,23 +147,7 @@ def analyze(pkt):
 
 	display()
 
-mac_table = {}
-recent_activities = []
-tcp_syn_activities = []
-tcp_synack_activities = []
-icmp_pod_activities = []
-icmp_smurf_activities = []
-icmp_pod_flag = [False, None]
-icmp_smurf_flag = [False, None]
-syn_flood_flag = [False, None]
-synack_flood_flag = [False, None]
-banner = '''
------------------------
-SniffnDetect v.1.0alpha
------------------------
-'''
-
-n = 10
+n = 60
 
 interface = conf.iface
 my_ip = [x[4] for x in conf.route.routes if x[2] != '0.0.0.0' and x[3]==interface][0]
@@ -130,14 +156,14 @@ for x in conf.route.routes:
 	if x[3]==interface and x[4]==my_ip and x[2]=='0.0.0.0' and IPv4Address(x[1]).compressed.startswith("255.") and IPv4Address(x[0]).compressed.startswith(my_ip.split(".")[0]) and IPv4Address(x[0]).compressed.endswith(".0"):
 		netmask = IPv4Address(x[1]).compressed
 
-print("[+] Starting sniffing module..")
-print("[+] Started sniffing module at {}\n".format(str(datetime.now()).split(".")[0]))
+print("[+] Starting sniffing module at {} for {} seconds\n".format(str(datetime.now()).split(".")[0], n))
 start = time.time()
 while True:
 	try:
 		assert time.time() - start < n
 		sniff(count=1, prn=analyze)
+		print("[i] {} seconds remaining..".format(int(n - (time.time() - start))))
 	except AssertionError:
-		sys.exit("\n[i] Time's up. Thank you !!")
+		sys.exit("[i] Time's up. Thank you !!")
 #	except:
 #		sys.exit("[-] There was some unknown error. Shutting Down.")
