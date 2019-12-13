@@ -1,6 +1,7 @@
 import os
 import sys
-import datetime
+import ctypes
+from datetime import datetime
 from scapy.all import *
 from ipaddress import *
 
@@ -41,10 +42,7 @@ def check_avg_time(activities):
 	for i in range(len(activities)-1,len(activities)-21,-1):
 		time.append(activities[i][0]-activities[i-1][0])
 	time = sum(time)/len(activities)
-	if time<2 and recent_activities[-1][0] - activities[-1][0]<5:
-		return True
-	else:
-		return False
+	return ( time<2 and recent_activities[-1][0] - activities[-1][0]<5)
 
 def set_flag(activities):
 	temp_flag = [False,None]
@@ -53,7 +51,16 @@ def set_flag(activities):
 		if temp_flag[0]:
 			temp_flag[1] = list(set([i[3] for i in activities]))
 	return temp_flag
-
+	
+def is_admin():
+	try:
+		return os.getuid() == 0
+	except AttributeError:
+		pass
+	try:
+		return ctypes.windll.shell32.IsUserAnAdmin() == 1
+	except AttributeError:
+		return False
 def display():
 	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
 	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
@@ -96,7 +103,7 @@ def analyze(pkt):
 	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
 	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_len = None, None, None, None, None, None, None, None, None
 	protocol = []
-	
+	pkt=pkt[0]
 	if len(recent_activities)>5:
 		recent_activities = recent_activities[-5:]
 
@@ -105,58 +112,62 @@ def analyze(pkt):
 	icmp_pod_flag = set_flag(icmp_pod_activities)
 	icmp_smurf_flag = set_flag(icmp_smurf_activities)
 
-	if Ether in pkt[0]:
-		src_mac = pkt[0][Ether].src
-		dst_mac = pkt[0][Ether].dst
+	if Ether in pkt:
+		src_mac = pkt[Ether].src
+		dst_mac = pkt[Ether].dst
+	elif IP in pkt:
+		src_ip = pkt[IP].src
+		dst_ip = pkt[IP].dst
 	
-	if IP in pkt[0]:
-		src_ip = pkt[0][IP].src
-		dst_ip = pkt[0][IP].dst
-	
-	if TCP in pkt[0]:
+	if TCP in pkt:
 		protocol.append("TCP")
-		src_port = pkt[0][TCP].sport
-		dst_port = pkt[0][TCP].dport
-		tcp_flags = pkt[0][TCP].flags.flagrepr()
-	
-	if UDP in pkt[0]:
+		src_port = pkt[TCP].sport
+		dst_port = pkt[TCP].dport
+		tcp_flags = pkt[TCP].flags.flagrepr()
+	elif UDP in pkt:
 		protocol.append("UDP")
-		src_port = pkt[0][UDP].sport
-		dst_port = pkt[0][UDP].dport
-	
-	if ICMP in pkt[0]:
+		src_port = pkt[UDP].sport
+		dst_port = pkt[UDP].dport
+	elif ICMP in pkt:
 		protocol.append("ICMP")
-		icmp_type = pkt[0][ICMP].type # 8 for echo-request and 0 for echo-reply
+		icmp_type = pkt[ICMP].type # 8 for echo-request and 0 for echo-reply
 	
-	if ARP in pkt[0] and pkt[0][ARP].op in (1,2):
+	if ARP in pkt and pkt[ARP].op in (1,2):
 		protocol.append("ARP")
-		if pkt[0][ARP].hwsrc in mac_table.keys() and mac_table[pkt[0][ARP].hwsrc] != pkt[0][ARP].psrc:
-			mac_table[pkt[0][ARP].hwsrc] = pkt[0][ARP].psrc
-		if pkt[0][ARP].hwsrc not in mac_table.keys():
-			mac_table[pkt[0][ARP].hwsrc] = pkt[0][ARP].psrc
+		if pkt[ARP].hwsrc in mac_table.keys() and mac_table[pkt[ARP].hwsrc] != pkt[ARP].psrc:
+			mac_table[pkt[ARP].hwsrc] = pkt[ARP].psrc
+		if pkt[ARP].hwsrc not in mac_table.keys():
+			mac_table[pkt[ARP].hwsrc] = pkt[ARP].psrc
 
-	if Raw in pkt[0]:
-#		load_data = pkt[0][Raw].load
-		load_len = len(pkt[0][Raw].load)
-
-	if src_ip == my_ip and src_mac != my_mac and ICMP in pkt[0]:
-		icmp_smurf_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
-		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<ICMP SMURF PACKET>"])
-	if ICMP in pkt[0] and load_len>1024:
-		icmp_pod_activities.append([pkt[0].time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
-		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<PING OF DEATH PACKET>"])
-	if TCP in pkt[0] and tcp_flags == "S" and dst_ip == my_ip:
-		tcp_syn_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
-		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN PACKET>"])
-	if TCP in pkt[0] and tcp_flags == "SA" and dst_ip == my_ip:
-		tcp_synack_activities.append([pkt[0].time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
-		recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN-ACK PACKET>"])
-	recent_activities.append([pkt[0].time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, None])
+	if Raw in pkt:
+#		load_data = pkt[Raw].load
+		load_len = len(pkt[Raw].load)
+	
+	if ICMP in pkt:
+		if src_ip == my_ip and src_mac != my_mac:
+			icmp_smurf_activities.append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
+			recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<ICMP SMURF PACKET>"])
+		if load_len>1024:
+			icmp_pod_activities.append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
+			recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<PING OF DEATH PACKET>"])
+	if dst_ip == my_ip:
+		if TCP in pkt:
+			if tcp_flags == "S":
+				tcp_syn_activities.append([pkt.time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
+				recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN PACKET>"])
+			elif tcp_flags == "SA":
+				tcp_synack_activities.append([pkt.time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
+				recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN-ACK PACKET>"])
+	recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, None])
 
 	display()
 
+#Time in Seconds To Run
 n = 60
-
+clear_screen()
+if not is_admin():
+	print("\t\tPlease Execute With Admin or sudo rights\nExiting")
+	sys.exit(0)
 interface = conf.iface
 my_ip = [x[4] for x in conf.route.routes if x[2] != '0.0.0.0' and x[3]==interface][0]
 my_mac = get_if_hwaddr(interface)
