@@ -15,7 +15,7 @@ icmp_smurf_flag = [False, []]
 syn_flood_flag = [False, []]
 synack_flood_flag = [False, []]
 banner = '''-----------------------
-SniffnDetect v.1.0alpha
+SniffnDetect v.1.0beta
 -----------------------
 '''
 
