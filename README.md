@@ -27,3 +27,9 @@ $ cd SniffnDetect
 ```
 
 This command will run the script for 60 seconds.
+
+## Donate
+
+If you feel this project was awesome, you can give me a cup of coffee :)
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.me/priyamharsh14)
