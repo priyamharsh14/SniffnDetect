@@ -31,18 +31,17 @@ def clear_screen():
 def find_attackers(mac_data):
 	msg = []
 	for mac in mac_data:
-		if mac in mac_table.keys():
-			msg.append("["+str(mac_table[mac])+" ("+mac+")]")
-		else:
-			msg.append("[Unknown IP ("+mac+")]")
+		msg.append("["+str(mac_table[mac])+" ("+mac+")]" if mac in mac_table else "[Unknown IP ("+mac+")]")
 	return " ".join(msg)
 
 def check_avg_time(activities):
-	time = []
-	for i in range(len(activities)-1,len(activities)-21,-1):
-		time.append(activities[i][0]-activities[i-1][0])
-	time = sum(time)/len(activities)
-	return ( time<2 and recent_activities[-1][0] - activities[-1][0]<5)
+	time = 0
+	c = -1
+	while c>-21:
+		time += activities[c][0] - activities[c-1][0]
+		c -= 1
+	time /= len(activities)
+	return ( time<2 and recent_activities[-1][0] - activities[-1][0] < 5)
 
 def set_flag(activities):
 	temp_flag = [False,None]
