@@ -1,20 +1,14 @@
 import os
 import sys
 import ctypes
-from datetime import datetime
+import threading
 from scapy.all import *
 from ipaddress import *
+from queue import Queue
+from datetime import datetime
 
-mac_table = {}
-recent_activities = []
-filtered_activities = {
-	'TCP-SYN': {'flag': False, 'activities': [], 'attacker-mac': []},
-	'TCP-SYNACK': {'flag': False, 'activities': [], 'attacker-mac': []},
-	'ICMP-POD': {'flag': False, 'activities': [], 'attacker-mac': []},
-	'ICMP-SMURF': {'flag': False, 'activities': [], 'attacker-mac': []},
-}
 banner = '''-----------------------
-SniffnDetect v.1.0beta
+SniffnDetect v.1.1
 -----------------------
 '''
 
@@ -25,6 +19,18 @@ def clear_screen():
 		os.system("cls")
 	else:
 		pass
+
+def sniffer_threader():
+	while True:
+		pkt = sniff(count=1)
+		with threading.Lock():
+			PACKETS_QUEUE.put(pkt[0])
+
+def analyze_threader():
+	while True:
+		pkt = PACKETS_QUEUE.get()
+		analyze_packet(pkt)
+		PACKETS_QUEUE.task_done()
 
 def find_attackers(mac_data):
 	msg = []
@@ -42,7 +48,7 @@ def check_avg_time(activities):
 	return ( time<2 and recent_activities[-1][0] - activities[-1][0] < 10)
 
 def set_flags():
-	global filtered_activities, recent_activities
+	global mac_table, recent_activities, filtered_activities, PACKETS_QUEUE, INTERFACE, MY_NETMASK, MY_IP, MY_MAC
 	for category in filtered_activities:
 		if len(filtered_activities[category]['activities'])>20:
 			filtered_activities[category]['flag'] = check_avg_time(filtered_activities[category]['activities'])
@@ -59,54 +65,11 @@ def is_admin():
 	except AttributeError:
 		return False
 		
-def display():
-	global mac_table, recent_activities, filtered_activities
-	clear_screen()
-	print(banner)
-	print('''[i] Current Interface = {}
-[i] Current IP = {}
-[i] Current Subnet Mask = {}
-[i] Current MAC = {}
-[i] Recent Activities:
-'''.format(interface, my_ip, netmask, my_mac))
-	for i in recent_activities[::-1]:
-		if i[8]:
-			msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+") ["+str(i[8])+" bytes]"
-		else:
-			msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+")"
-		if i[9]:
-			print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg, i[9])
-		else:
-			print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg)
-	print('''
-[i] ICMP Smurf Attack:\t {} - [{} packet(s)]
-[i] Ping of Death:\t {} - [{} packet(s)]
-[i] TCP SYN Flood:\t {} - [{} packet(s)]
-[i] TCP SYN-ACK Flood:\t {} - [{} packet(s)]
-'''.format(
-	filtered_activities['ICMP-SMURF']['flag'], len(filtered_activities['ICMP-SMURF']['activities']),
-	filtered_activities['ICMP-POD']['flag'], len(filtered_activities['ICMP-POD']['activities']),
-	filtered_activities['TCP-SYN']['flag'], len(filtered_activities['TCP-SYN']['activities']),
-	filtered_activities['TCP-SYNACK']['flag'], len(filtered_activities['TCP-SYNACK']['activities']),
-	))
-	if any([filtered_activities[category]['flag'] for category in filtered_activities]):
-		print("[i] Potential Attacker(s):\n")
-		for category in filtered_activities:
-			if category == 'ICMP-POD':
-				print("Ping of Death Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
-			elif category == 'ICMP-SMURF':
-				print("ICMP Smurf Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
-			elif category == 'TCP-SYNACK':
-				print("SYN-ACK Flood Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
-			elif category == 'TCP-SYN':
-				print("SYN Flood Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
-		print()
-
-def analyze(pkt):
-	global mac_table, recent_activities, filtered_activities
+def analyze_packet(pkt):
+	global mac_table, recent_activities, filtered_activities, PACKETS_QUEUE, INTERFACE, MY_NETMASK, MY_IP, MY_MAC
 	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_len = None, None, None, None, None, None, None, None, None
 	protocol = []
-	pkt=pkt[0]
+
 	if len(recent_activities)>5:
 		recent_activities = recent_activities[-5:]
 	
@@ -147,13 +110,13 @@ def analyze(pkt):
 		load_len = len(pkt[Raw].load)
 	
 	if ICMP in pkt:
-		if src_ip == my_ip and src_mac != my_mac:
+		if src_ip == MY_IP and src_mac != MY_MAC:
 			filtered_activities['ICMP-SMURF']['activities'].append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
 			recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<ICMP SMURF PACKET>"])
 		if load_len>1024:
 			filtered_activities['ICMP-POD']['activities'].append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
 			recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<PING OF DEATH PACKET>"])
-	if dst_ip == my_ip:
+	if dst_ip == MY_IP:
 		if TCP in pkt:
 			if tcp_flags == "S":
 				filtered_activities['TCP-SYN']['activities'].append([pkt.time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
@@ -163,26 +126,88 @@ def analyze(pkt):
 				recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN-ACK PACKET>"])
 	recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, None])
 
-	display()
+def main():
+	global mac_table, recent_activities, filtered_activities, PACKETS_QUEUE, INTERFACE, MY_NETMASK, MY_IP, MY_MAC
+	sniff_thread = threading.Thread(target=sniffer_threader)
+	sniff_thread.daemon = True
+	sniff_thread.start()
+	analyze_thread = threading.Thread(target=analyze_threader)
+	analyze_thread.daemon = True
+	analyze_thread.start()
+	while True:
+		global mac_table, recent_activities, filtered_activities, PACKETS_QUEUE, INTERFACE, MY_NETMASK, MY_IP, MY_MAC
+		clear_screen()
+		print(banner)
+		print('''[i] Current Interface = {}
+[i] Current IP = {}
+[i] Current Subnet Mask = {}
+[i] Current MAC = {}
 
-#Time in Seconds To Run
-n = 60
-clear_screen()
-if not is_admin():
-	print("[-] Please execute the script with Admin or root rights\n[-] Exiting..")
-	sys.exit(0)
-interface = conf.iface
-my_ip = [x[4] for x in conf.route.routes if x[2] != '0.0.0.0' and x[3]==interface][0]
-my_mac = get_if_hwaddr(interface)
-for x in conf.route.routes:
-	if x[3]==interface and x[4]==my_ip and x[2]=='0.0.0.0' and IPv4Address(x[1]).compressed.startswith("255.") and IPv4Address(x[0]).compressed.startswith(my_ip.split(".")[0]) and IPv4Address(x[0]).compressed.endswith(".0"):
-		netmask = IPv4Address(x[1]).compressed
+[i] Recent Activities:
+'''.format(INTERFACE, MY_IP, MY_NETMASK, MY_MAC))
+		for i in recent_activities[::-1]:
+			if i[8]:
+				msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+") ["+str(i[8])+" bytes]"
+			else:
+				msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+")"
+			if i[9]:
+				print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg, i[9])
+			else:
+				print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg)
+		print('''
+[i] ICMP Smurf Attack:\t {}
+[i] Ping of Death:\t {}
+[i] TCP SYN Flood:\t {}
+[i] TCP SYN-ACK Flood:\t {}
+'''.format(
+		filtered_activities['ICMP-SMURF']['flag'], filtered_activities['ICMP-POD']['flag'],
+		filtered_activities['TCP-SYN']['flag'], filtered_activities['TCP-SYNACK']['flag'],
+		))
+		if any([filtered_activities[category]['flag'] for category in filtered_activities]):
+			print("[i] Potential Attacker(s):\n")
+			for category in filtered_activities:
+				if category == 'ICMP-POD':
+					print("Ping of Death Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
+				elif category == 'ICMP-SMURF':
+					print("ICMP Smurf Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
+				elif category == 'TCP-SYNACK':
+					print("SYN-ACK Flood Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
+				elif category == 'TCP-SYN':
+					print("SYN Flood Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
+			print()
+		time.sleep(0.5)
 
-print("[+] Starting sniffing module at {} for {} seconds\n".format(str(datetime.now()).split(".")[0], n))
-start = time.time()
-while True:
+if __name__=="__main__":
+	mac_table = {}
+	recent_activities = []
+	filtered_activities = {
+		'TCP-SYN': {'flag': False, 'activities': [], 'attacker-mac': []},
+		'TCP-SYNACK': {'flag': False, 'activities': [], 'attacker-mac': []},
+		'ICMP-POD': {'flag': False, 'activities': [], 'attacker-mac': []},
+		'ICMP-SMURF': {'flag': False, 'activities': [], 'attacker-mac': []},
+	}
+
+	PACKETS_QUEUE = Queue()
+
+	clear_screen()
+	if not is_admin():
+		print("[-] Please execute the script with root or administrator priviledges.")
+		sys.exit(" Exiting.")
+	
+	INTERFACE = conf.iface
+	MY_IP = [x[4] for x in conf.route.routes if x[2] != '0.0.0.0' and x[3]==INTERFACE][0]
+	MY_MAC = get_if_hwaddr(INTERFACE)
+	MY_NETMASK = [IPv4Address(x[1]).compressed for x in conf.route.routes if x[3]==INTERFACE and x[4]==MY_IP and x[2]=='0.0.0.0' and IPv4Address(x[1]).compressed.startswith("255.") and IPv4Address(x[0]).compressed.startswith(MY_IP.split(".")[0]) and IPv4Address(x[0]).compressed.endswith(".0")][0]
+
 	try:
-		assert time.time() - start < n
-		sniff(count=1, prn=analyze)
-	except AssertionError:
-		sys.exit("[i] Time's up. Thank you !!")
+		print("[+] Starting sniffing module at {}\n".format(str(datetime.now()).split(".")[0]))
+		main()
+	except KeyboardInterrupt:
+		print("\n[-] Ctrl+C triggered.")
+	except EOFError:
+		print("\n[-] Ctrl+Z triggered.")
+	except:
+		print("[-] Some unknown error occured.")
+		print("[!] EXCEPTION: "+traceback.print_exc())
+	finally:
+		sys.exit("\n[-] Exiting.")
