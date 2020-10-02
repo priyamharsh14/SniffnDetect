@@ -7,14 +7,12 @@ from ipaddress import *
 
 mac_table = {}
 recent_activities = []
-tcp_syn_activities = []
-tcp_synack_activities = []
-icmp_pod_activities = []
-icmp_smurf_activities = []
-icmp_pod_flag = [False, []]
-icmp_smurf_flag = [False, []]
-syn_flood_flag = [False, []]
-synack_flood_flag = [False, []]
+filtered_activities = {
+	'TCP-SYN': {'flag': False, 'activities': [], 'attacker-mac': []},
+	'TCP-SYNACK': {'flag': False, 'activities': [], 'attacker-mac': []},
+	'ICMP-POD': {'flag': False, 'activities': [], 'attacker-mac': []},
+	'ICMP-SMURF': {'flag': False, 'activities': [], 'attacker-mac': []},
+}
 banner = '''-----------------------
 SniffnDetect v.1.0beta
 -----------------------
@@ -41,15 +39,15 @@ def check_avg_time(activities):
 		time += activities[c][0] - activities[c-1][0]
 		c -= 1
 	time /= len(activities)
-	return ( time<2 and recent_activities[-1][0] - activities[-1][0] < 5)
+	return ( time<2 and recent_activities[-1][0] - activities[-1][0] < 10)
 
-def set_flag(activities):
-	temp_flag = [False,None]
-	if len(activities)>20:
-		temp_flag[0] = check_avg_time(activities)
-		if temp_flag[0]:
-			temp_flag[1] = list(set([i[3] for i in activities]))
-	return temp_flag
+def set_flags():
+	global filtered_activities, recent_activities
+	for category in filtered_activities:
+		if len(filtered_activities[category]['activities'])>20:
+			filtered_activities[category]['flag'] = check_avg_time(filtered_activities[category]['activities'])
+			if filtered_activities[category]['flag']:
+				filtered_activities[category]['attacker-mac'] = list(set([i[3] for i in filtered_activities[category]['activities']]))
 	
 def is_admin():
 	try:
@@ -62,15 +60,15 @@ def is_admin():
 		return False
 		
 def display():
-	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
-	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
+	global mac_table, recent_activities, filtered_activities
 	clear_screen()
 	print(banner)
-	print("[i] Current Interface =",interface)
-	print("[i] Current IP =",my_ip)
-	print("[i] Current Subnet Mask =",netmask)
-	print("[i] Current MAC = {}\n".format(my_mac))
-	print("[i] Recent Activities:\n")
+	print('''[i] Current Interface = {}
+[i] Current IP = {}
+[i] Current Subnet Mask = {}
+[i] Current MAC = {}
+[i] Recent Activities:
+'''.format(interface, my_ip, netmask, my_mac))
 	for i in recent_activities[::-1]:
 		if i[8]:
 			msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+") ["+str(i[8])+" bytes]"
@@ -80,37 +78,43 @@ def display():
 			print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg, i[9])
 		else:
 			print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg)
-	print("\n[i] ICMP Smurf Attack:\t {} - [{} packet(s)]".format(icmp_smurf_flag[0], len(icmp_smurf_activities)))
-	print("[i] Ping of Death:\t {} - [{} packet(s)]".format(icmp_pod_flag[0], len(icmp_pod_activities)))
-	print("[i] TCP SYN Flood:\t {} - [{} packet(s)]".format(syn_flood_flag[0], len(tcp_syn_activities)))
-	print("[i] TCP SYN-ACK Flood:\t {} - [{} packet(s)]\n".format(synack_flood_flag[0], len(tcp_synack_activities)))
-	if any([icmp_pod_flag[0], icmp_smurf_flag[0], synack_flood_flag[0], syn_flood_flag[0]]):
+	print('''
+[i] ICMP Smurf Attack:\t {} - [{} packet(s)]
+[i] Ping of Death:\t {} - [{} packet(s)]
+[i] TCP SYN Flood:\t {} - [{} packet(s)]
+[i] TCP SYN-ACK Flood:\t {} - [{} packet(s)]
+'''.format(
+	filtered_activities['ICMP-SMURF']['flag'], len(filtered_activities['ICMP-SMURF']['activities']),
+	filtered_activities['ICMP-POD']['flag'], len(filtered_activities['ICMP-POD']['activities']),
+	filtered_activities['TCP-SYN']['flag'], len(filtered_activities['TCP-SYN']['activities']),
+	filtered_activities['TCP-SYNACK']['flag'], len(filtered_activities['TCP-SYNACK']['activities']),
+	))
+	if any([filtered_activities[category]['flag'] for category in filtered_activities]):
 		print("[i] Potential Attacker(s):\n")
-		for i in enumerate([icmp_pod_flag, icmp_smurf_flag, synack_flood_flag, syn_flood_flag]):
-			if i[1][0]:
-				if i[0] == 0:
-					print("Ping of Death Attacker(s): ", find_attackers(i[1][1]))
-				elif i[0] == 1:
-					print("ICMP Smurf Attacker(s): ", find_attackers(i[1][1]))
-				elif i[0] == 2:
-					print("SYN-ACK Flood Attacker(s): ", find_attackers(i[1][1]))
-				elif i[0] == 3:
-					print("SYN Flood Attacker(s): ", find_attackers(i[1][1]))
+		for category in filtered_activities:
+			if category == 'ICMP-POD':
+				print("Ping of Death Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
+			elif category == 'ICMP-SMURF':
+				print("ICMP Smurf Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
+			elif category == 'TCP-SYNACK':
+				print("SYN-ACK Flood Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
+			elif category == 'TCP-SYN':
+				print("SYN Flood Attacker(s): ", find_attackers(filtered_activities[category]['attacker-mac']))
 		print()
 
 def analyze(pkt):
-	global mac_table, recent_activities, tcp_syn_activities, icmp_pod_activities, icmp_smurf_activities, tcp_synack_activities
-	global icmp_smurf_flag, icmp_pod_flag, syn_flood_flag, synack_flood_flag
+	global mac_table, recent_activities, filtered_activities
 	src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, tcp_flags, icmp_type, load_len = None, None, None, None, None, None, None, None, None
 	protocol = []
 	pkt=pkt[0]
 	if len(recent_activities)>5:
 		recent_activities = recent_activities[-5:]
+	
+	for category in filtered_activities:
+		if len(filtered_activities[category]['activities'])>30:
+			filtered_activities[category]['activities'] = filtered_activities[category]['activities'][-30:]
 
-	syn_flood_flag = set_flag(tcp_syn_activities)
-	synack_flood_flag = set_flag(tcp_synack_activities)
-	icmp_pod_flag = set_flag(icmp_pod_activities)
-	icmp_smurf_flag = set_flag(icmp_smurf_activities)
+	set_flags()
 
 	if Ether in pkt:
 		src_mac = pkt[Ether].src
@@ -140,23 +144,22 @@ def analyze(pkt):
 			mac_table[pkt[ARP].hwsrc] = pkt[ARP].psrc
 
 	if Raw in pkt:
-#		load_data = pkt[Raw].load
 		load_len = len(pkt[Raw].load)
 	
 	if ICMP in pkt:
 		if src_ip == my_ip and src_mac != my_mac:
-			icmp_smurf_activities.append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
+			filtered_activities['ICMP-SMURF']['activities'].append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
 			recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<ICMP SMURF PACKET>"])
 		if load_len>1024:
-			icmp_pod_activities.append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
+			filtered_activities['ICMP-POD']['activities'].append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
 			recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<PING OF DEATH PACKET>"])
 	if dst_ip == my_ip:
 		if TCP in pkt:
 			if tcp_flags == "S":
-				tcp_syn_activities.append([pkt.time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
+				filtered_activities['TCP-SYN']['activities'].append([pkt.time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
 				recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN PACKET>"])
 			elif tcp_flags == "SA":
-				tcp_synack_activities.append([pkt.time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
+				filtered_activities['TCP-SYNACK']['activities'].append([pkt.time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
 				recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, "<SYN-ACK PACKET>"])
 	recent_activities.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len, None])
 
@@ -183,5 +186,3 @@ while True:
 		sniff(count=1, prn=analyze)
 	except AssertionError:
 		sys.exit("[i] Time's up. Thank you !!")
-#	except:
-#		sys.exit("[-] There was some unknown error. Shutting Down.")
