@@ -77,9 +77,12 @@ class SniffnDetect():
 		if Ether in pkt:
 			src_mac = pkt[Ether].src
 			dst_mac = pkt[Ether].dst
-		elif IP in pkt:
+		if IP in pkt:
 			src_ip = pkt[IP].src
 			dst_ip = pkt[IP].dst
+		if IPv6 in pkt:
+			src_ip = pkt[IPv6].src
+			dst_ip = pkt[IPv6].dst
 		
 		if TCP in pkt:
 			protocol.append("TCP")
@@ -137,7 +140,17 @@ class SniffnDetect():
 		return self.flag
 	
 	def stop(self):
+		self.PACKETS_QUEUE = Queue()
+		self.MAC_TABLE = {}
+		self.RECENT_ACTIVITIES = []
+		self.FILTERED_ACTIVITIES = {
+			'TCP-SYN': {'flag': False, 'activities': [], 'attacker-mac': []},
+			'TCP-SYNACK': {'flag': False, 'activities': [], 'attacker-mac': []},
+			'ICMP-POD': {'flag': False, 'activities': [], 'attacker-mac': []},
+			'ICMP-SMURF': {'flag': False, 'activities': [], 'attacker-mac': []},
+		}
 		self.flag = False
+		self.WEBSOCKET = None
 		return self.flag
 
 def clear_screen():

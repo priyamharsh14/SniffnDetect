@@ -37,8 +37,10 @@ async def ws():
             await websocket.accept()
         else:
             return "Already connect to WS", 400
+        while sniffer.WEBSOCKET is not None:
+            await sniffer.WEBSOCKET.send("\n".join([f"{pkt}" for pkt in sniffer.RECENT_ACTIVITIES[::-1]]))
+            time.sleep(0.5)
     except asyncio.CancelledError:
-        sniffer.WEBSOCKET = None
         sniffer.stop()
         raise
 
