@@ -1,0 +1,22 @@
+<html>
+    <head>
+        <title>SnD</title>
+    </head>
+    <body>
+        <label>Interface</label>
+        <input type="text" value="{{ config.0 }}" disabled><br>
+        <label>Current IP</label>
+        <input type="text" value="{{ config.1 }}" disabled><br>
+        <label>Current MAC</label>
+        <input type="text" value="{{ config.2 }}" disabled><br>
+        <br>
+        <textarea id="snd"></textarea>
+        <script type="text/javascript">
+            var ws = new WebSocket('ws://' + document.domain + ':' + location.port + '/ws');
+            var _element = document.getElementById('snd');
+            ws.onmessage = function (event) {
+                _element.innerHTML = event.data;
+            };
+        </script>
+    </body>
+</html>

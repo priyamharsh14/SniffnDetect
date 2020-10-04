@@ -3,7 +3,6 @@ import sys
 import ctypes
 import threading
 from scapy.all import *
-from ipaddress import *
 from queue import Queue
 from datetime import datetime
 
@@ -15,9 +14,8 @@ SniffnDetect v.1.1
 class SniffnDetect():
 	def __init__(self):
 		self.INTERFACE = conf.iface
-		self.MY_IP = [x[4] for x in conf.route.routes if x[2] != '0.0.0.0' and x[3]==INTERFACE][0]
-		self.MY_MAC = get_if_hwaddr(INTERFACE)
-		self.MY_NETMASK = [IPv4Address(x[1]).compressed for x in conf.route.routes if x[3]==INTERFACE and x[4]==MY_IP and x[2]=='0.0.0.0' and IPv4Address(x[1]).compressed.startswith("255.") and IPv4Address(x[0]).compressed.startswith(MY_IP.split(".")[0]) and IPv4Address(x[0]).compressed.endswith(".0")][0]
+		self.MY_IP = self.INTERFACE.ip
+		self.MY_MAC = self.INTERFACE.mac
 		self.PACKETS_QUEUE = Queue()
 		self.MAC_TABLE = {}
 		self.RECENT_ACTIVITIES = []
@@ -27,15 +25,16 @@ class SniffnDetect():
 			'ICMP-POD': {'flag': False, 'activities': [], 'attacker-mac': []},
 			'ICMP-SMURF': {'flag': False, 'activities': [], 'attacker-mac': []},
 		}
+		self.flag = False
 
 	def sniffer_threader(self):
-		while True:
+		while self.flag:
 			pkt = sniff(count=1)
 			with threading.Lock():
 				self.PACKETS_QUEUE.put(pkt[0])
 
 	def analyze_threader(self):
-		while True:
+		while self.flag:
 			pkt = self.PACKETS_QUEUE.get()
 			self.analyze_packet(pkt)
 			self.PACKETS_QUEUE.task_done()
@@ -125,6 +124,20 @@ class SniffnDetect():
 					self.FILTERED_ACTIVITIES['TCP-SYNACK']['activities'].append([pkt.time])
 
 		self.RECENT_ACTIVITIES.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len])
+	
+	def start(self):
+		self.flag = True
+		sniff_thread = threading.Thread(target=sniffer_threader)
+		sniff_thread.daemon = True
+		sniff_thread.start()
+		analyze_thread = threading.Thread(target=analyze_threader)
+		analyze_thread.daemon = True
+		analyze_thread.start()
+		return self.flag
+	
+	def stop(self):
+		self.flag = False
+		return self.flag
 
 def clear_screen():
 	if "linux" in sys.platform:
@@ -144,6 +157,7 @@ def is_admin():
 	except AttributeError:
 		return False
 
+'''
 def main():
 	global mac_table, recent_activities, filtered_activities, PACKETS_QUEUE, INTERFACE, MY_NETMASK, MY_IP, MY_MAC
 	sniff_thread = threading.Thread(target=sniffer_threader)
@@ -156,13 +170,7 @@ def main():
 		global mac_table, recent_activities, filtered_activities, PACKETS_QUEUE, INTERFACE, MY_NETMASK, MY_IP, MY_MAC
 		clear_screen()
 		print(banner)
-		print('''[i] Current Interface = {}
-[i] Current IP = {}
-[i] Current Subnet Mask = {}
-[i] Current MAC = {}
-
-[i] Recent Activities:
-'''.format(INTERFACE, MY_IP, MY_NETMASK, MY_MAC))
+		print("[i] Current Interface = {}\n[i] Current IP = {}\n[i] Current Subnet Mask = {}\n[i] Current MAC = {}\n[i] Recent Activities:".format(INTERFACE, MY_IP, MY_NETMASK, MY_MAC))
 		for i in recent_activities[::-1]:
 			if i[8]:
 				msg = ' '.join(i[1])+" "+str(i[2])+":"+str(i[6])+" ("+str(i[4])+") => "+str(i[3])+":"+str(i[7])+" ("+str(i[5])+") ["+str(i[8])+" bytes]"
@@ -172,12 +180,7 @@ def main():
 				print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg, i[9])
 			else:
 				print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i[0])), msg)
-		print('''
-[i] ICMP Smurf Attack:\t {}
-[i] Ping of Death:\t {}
-[i] TCP SYN Flood:\t {}
-[i] TCP SYN-ACK Flood:\t {}
-'''.format(
+		print("[i] ICMP Smurf Attack:\t {}\n[i] Ping of Death:\t {}\n[i] TCP SYN Flood:\t {}\n[i] TCP SYN-ACK Flood:\t {}".format(
 		filtered_activities['ICMP-SMURF']['flag'], filtered_activities['ICMP-POD']['flag'],
 		filtered_activities['TCP-SYN']['flag'], filtered_activities['TCP-SYNACK']['flag'],
 		))
@@ -229,3 +232,4 @@ if __name__=="__main__":
 		print("[!] EXCEPTION: "+traceback.print_exc())
 	finally:
 		sys.exit("\n[-] Exiting.")
+'''
