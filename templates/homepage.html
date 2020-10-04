@@ -22,7 +22,8 @@
                 console.log(error);
                 return null;
             }).then((response) => {
-                console.log(response);
+                var _element = document.getElementById('snd');
+                _element.innerHTML += response['message']+"\n";
             });
         };
         function stop() {
@@ -32,7 +33,8 @@
                 console.log(error);
                 return null;
             }).then((response) => {
-                console.log(response);
+                var _element = document.getElementById('snd');
+                _element.innerHTML += response['message']+"\n";
             });
         };
         var ws = new WebSocket('ws://' + document.domain + ':' + location.port + '/ws');

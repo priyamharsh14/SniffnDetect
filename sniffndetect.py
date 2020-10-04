@@ -4,7 +4,6 @@ import ctypes
 import threading
 from scapy.all import *
 from queue import Queue
-from datetime import datetime
 
 banner = '''-----------------------
 SniffnDetect v.1.1
@@ -16,6 +15,7 @@ class SniffnDetect():
 		self.INTERFACE = conf.iface
 		self.MY_IP = self.INTERFACE.ip
 		self.MY_MAC = self.INTERFACE.mac
+		self.WEBSOCKET = None
 		self.PACKETS_QUEUE = Queue()
 		self.MAC_TABLE = {}
 		self.RECENT_ACTIVITIES = []
