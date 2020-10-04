@@ -11,12 +11,35 @@
         <input type="text" value="{{ config.2 }}" disabled><br>
         <br>
         <textarea id="snd"></textarea>
+        <br><br>
+        <button type="button" onclick="start();">START</button>
+        <button type="button" onclick="stop();">STOP</button>
         <script type="text/javascript">
-            var ws = new WebSocket('ws://' + document.domain + ':' + location.port + '/ws');
-            var _element = document.getElementById('snd');
-            ws.onmessage = function (event) {
-                _element.innerHTML = event.data;
-            };
+        function start() {
+            fetch("/api/v1/start", {
+				method: "GET"
+			}).then((response) => response.json(), (error) => {
+                console.log(error);
+                return null;
+            }).then((response) => {
+                console.log(response);
+            });
+        };
+        function stop() {
+            fetch("/api/v1/stop", {
+				method: "GET"
+			}).then((response) => response.json(), (error) => {
+                console.log(error);
+                return null;
+            }).then((response) => {
+                console.log(response);
+            });
+        };
+        var ws = new WebSocket('ws://' + document.domain + ':' + location.port + '/ws');
+        var _element = document.getElementById('snd');
+        ws.onmessage = function (event) {
+            _element.innerHTML += event.data + "\n";
+        };
         </script>
     </body>
 </html>

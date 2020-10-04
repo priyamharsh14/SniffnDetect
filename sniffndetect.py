@@ -105,7 +105,7 @@ class SniffnDetect():
 			load_len = len(pkt[Raw].load)
 		
 		if ICMP in pkt:
-			if src_ip == MY_IP and src_mac != MY_MAC:
+			if src_ip == self.MY_IP and src_mac != self.MY_MAC:
 				# self.FILTERED_ACTIVITIES['ICMP-SMURF']['activities'].append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
 				self.FILTERED_ACTIVITIES['ICMP-SMURF']['activities'].append([pkt.time])
 
@@ -113,7 +113,7 @@ class SniffnDetect():
 				# self.FILTERED_ACTIVITIES['ICMP-POD']['activities'].append([pkt.time, icmp_type, src_ip, src_mac, dst_ip, dst_mac, load_len])
 				self.FILTERED_ACTIVITIES['ICMP-POD']['activities'].append([pkt.time])
 
-		if dst_ip == MY_IP:
+		if dst_ip == self.MY_IP:
 			if TCP in pkt:
 				if tcp_flags == "S":
 					# self.FILTERED_ACTIVITIES['TCP-SYN']['activities'].append([pkt.time, src_ip, src_port, src_mac, dst_ip, dst_port, dst_mac, load_len])
@@ -126,13 +126,14 @@ class SniffnDetect():
 		self.RECENT_ACTIVITIES.append([pkt.time, protocol, src_ip, dst_ip, src_mac, dst_mac, src_port, dst_port, load_len])
 	
 	def start(self):
-		self.flag = True
-		sniff_thread = threading.Thread(target=sniffer_threader)
-		sniff_thread.daemon = True
-		sniff_thread.start()
-		analyze_thread = threading.Thread(target=analyze_threader)
-		analyze_thread.daemon = True
-		analyze_thread.start()
+		if not self.flag:
+			self.flag = True
+			sniff_thread = threading.Thread(target=self.sniffer_threader)
+			sniff_thread.daemon = True
+			sniff_thread.start()
+			analyze_thread = threading.Thread(target=self.analyze_threader)
+			analyze_thread.daemon = True
+			analyze_thread.start()
 		return self.flag
 	
 	def stop(self):
