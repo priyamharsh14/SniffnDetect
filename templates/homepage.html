@@ -10,38 +10,37 @@
         <label>Current MAC</label>
         <input type="text" value="{{ config.2 }}" disabled><br>
         <br>
-        <textarea id="activities"></textarea>
-        <textarea id="logs"></textarea>
+        <textarea id="activities" style="width: 100%; height: 40vh;"></textarea>
+        <textarea id="logs" style="width: 100%; height: 20vh;"></textarea>
         <br><br>
-        <button type="button" onclick="start();">START</button>
-        <button type="button" onclick="stop();">STOP</button>
+        <button type="button" id="start-sniffer">START</button>
+        <button type="button" id="stop-sniffer">STOP</button>
         <script type="text/javascript">
-        function start() {
-            fetch("/api/v1/start", {
-				method: "GET"
-			}).then((response) => response.json(), (error) => {
-                console.log(error);
-                return null;
-            }).then((response) => {
-                var _element = document.getElementById('logs');
-                _element.innerHTML += response['message']+"\n";
-            });
-        };
-        function stop() {
-            fetch("/api/v1/stop", {
-				method: "GET"
-			}).then((response) => response.json(), (error) => {
-                console.log(error);
-                return null;
-            }).then((response) => {
-                var _element = document.getElementById('logs');
-                _element.innerHTML += response['message']+"\n";
-            });
-        };
         var ws = new WebSocket('ws://' + document.domain + ':' + location.port + '/ws');
         var _element = document.getElementById('activities');
+        var _element2 = document.getElementById('logs');
+        var _startButton = document.getElementById('start-sniffer');
+        var _stopButton = document.getElementById('stop-sniffer');
         ws.onmessage = function (event) {
-            _element.innerHTML = event.data;
+            if (String(event.data).slice(0,5) == 'LOG::') {
+                _element2.innerHTML += event.data + "\n";
+            }
+            else {
+                _element.innerHTML = event.data;
+            }
+        };
+        ws.onerror = function (event) {
+            _startButton.setAttribute('disabled', 'disabled');
+            _stopButton.setAttribute('disabled', 'disabled');
+            alert('Failed to connect to websocket !');
+        };
+        ws.onopen = function () {
+            _startButton.onclick = function () {
+                ws.send('CMD::START');
+            };
+            _stopButton.onclick = function () {
+                ws.send('CMD::STOP');
+            };
         };
         </script>
     </body>

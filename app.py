@@ -9,42 +9,51 @@ sniffer = SniffnDetect()
 
 @app.route('/', methods=['GET'])
 async def index():
-    global sniffer
-    return await render_template('homepage.html', config=[sniffer.INTERFACE.name, sniffer.MY_IP, sniffer.MY_MAC])
+	global sniffer
+	return await render_template('homepage.html', config=[sniffer.INTERFACE.name, sniffer.MY_IP, sniffer.MY_MAC])
 
-@app.route('/api/v1/start', methods=['GET'])
-async def start_sniffer():
-    if sniffer.flag:
-        return {'status': 404, 'message': 'Already Running'}
-    else:
-        sniffer.start()
-        return {'status': 200, 'message': f'Started Sniffer @ {str(datetime.now()).split(".")[0]}'}
+async def WS_receiver():
+	while sniffer.WEBSOCKET is not None:
+		data = await sniffer.WEBSOCKET.receive()
+		if data == 'CMD::START':
+			if sniffer.flag:
+				await sniffer.WEBSOCKET.send('LOG::Already Started')
+			else:
+				sniffer.start()
+				await sniffer.WEBSOCKET.send(f'LOG::Started Sniffer @ {str(datetime.now()).split(".")[0]}')
+		elif data == 'CMD::STOP':
+			if sniffer.flag:
+				await sniffer.WEBSOCKET.send(f'LOG::Stopped Sniffer @ {str(datetime.now()).split(".")[0]}')
+				sniffer.stop()
+			else:
+				await sniffer.WEBSOCKET.send('LOG::Already Stopped')
+		else:
+			await sniffer.WEBSOCKET.send('LOG::Invalid CMD')
 
-@app.route('/api/v1/stop', methods=['GET'])
-async def stop_sniffer():
-    if sniffer.flag:
-        sniffer.stop()
-        return {'status': 200, 'message': f'Stopped Sniffer @ {str(datetime.now()).split(".")[0]}'}
-    else:
-        return {'status': 404, 'message': 'Already Stopped'}
+async def WS_sender():
+	while sniffer.WEBSOCKET is not None:
+		await sniffer.WEBSOCKET.send("\n".join([f"{pkt}" for pkt in sniffer.RECENT_ACTIVITIES[::-1]]))
 
 @app.websocket('/ws')
 async def ws():
-    global sniffer
-    try:
-        if not sniffer.WEBSOCKET:
-            sniffer.WEBSOCKET = websocket
-            await websocket.accept()
-        else:
-            return "Already connect to WS", 400
-        while sniffer.WEBSOCKET is not None:
-            await sniffer.WEBSOCKET.send("\n".join([f"{pkt}" for pkt in sniffer.RECENT_ACTIVITIES[::-1]]))
-            time.sleep(0.5)
-    except asyncio.CancelledError:
-        sniffer.stop()
-        raise
+	global sniffer
+	try:
+		if not sniffer.WEBSOCKET:
+			sniffer.WEBSOCKET = websocket
+			await websocket.accept()
+		else:
+			return "Already connect to WS", 400
+		producer = asyncio.create_task(WS_sender())
+		consumer = asyncio.create_task(WS_receiver())
+		await asyncio.gather(producer, consumer)
+	except asyncio.CancelledError:
+		sniffer.WEBSOCKET = None
+		raise
 
 if not is_admin():
-    sys.exit("[-] Please execute the script with root or administrator priviledges.\n[-] Exiting.")
+	sys.exit("[-] Please execute the script with root or administrator priviledges.\n[-] Exiting.")
 else:
-    app.run()
+	try:
+		app.run()
+	except KeyboardInterrupt:
+		sys.exit("[-] Ctrl + C triggered.\n[-] Shutting Down")
