@@ -4,6 +4,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300i,700,700i" rel="stylesheet">
         <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/typeit@7.0.4/dist/typeit.min.js"></script>
     </head>
     <body>
         <header>
@@ -12,7 +13,7 @@
             </div>
         </header>
         <br>
-        <div class="container">
+        <div class="container" id="info" style="display: none;">
             <div class="content">
                 <label>Interface</label>
                 <input type="text" value="{{ config.0 }}" class="input-text" disabled>
@@ -44,22 +45,41 @@
                 <input type="text" value="{{ flags['ICMP-SMURF']['flag'] }}" id="ICMP-SMURF" class="input-text" disabled>
             </div>
         </div>
-        <br>
-        <textarea disabled id="activities" style="width: 100%; height: 40vh;"></textarea>
-        <textarea disabled id="logs" style="width: 100%; height: 20vh;"></textarea>
-        <br><br>
-        <button type="button" id="start-sniffer">START</button>
-        <button type="button" id="stop-sniffer">STOP</button>
+        <div style="margin-bottom: 1.5rem;">
+            <label style="margin-left: 5%;">TERMINAL LOGS</label>
+            <textarea disabled id="logs" class="logs-area"></textarea>
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+            <label style="margin-left: 5%;">NETWORK ACTIVITIES</label>
+            <textarea disabled id="activities" style="height: 30vh;" class="logs-area"></textarea>
+        </div>
+        <div class="container">
+            <button type="button" id="start-sniffer">START</button>
+            <button type="button" id="stop-sniffer">STOP</button>
+            <button type="button" id="toggle-info">TOGGLE INFO</button>
+        </div>
         <script type="text/javascript">
         var ws = new WebSocket('ws://' + document.domain + ':' + location.port + '/ws');
         var _element = document.getElementById('activities');
         var _element2 = document.getElementById('logs');
         var _startButton = document.getElementById('start-sniffer');
         var _stopButton = document.getElementById('stop-sniffer');
+        document.getElementById('toggle-info').onclick = function () {
+            var _temp = document.getElementById('info');
+            if (_temp.style.display === "none") {
+                _temp.style.display = "flex";
+            } else {
+                _temp.style.display = "none";
+            }
+        };
         ws.onmessage = function (event) {
             switch (String(event.data).slice(0,5)) {
                 case 'LOG::':
-                    _element2.innerHTML += event.data + "\n";
+                    _element2.scrollTop = _element2.scrollHeight;
+                    new TypeIt("#logs", {
+                        speed: 10,
+                        waitUntilVisible: true
+                    }).type(event.data + "\n").go();
                     break;
                 case 'PKT::':
                     _element.innerHTML = String(event.data).slice(5);

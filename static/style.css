@@ -21,7 +21,7 @@ header .header-box {
     text-align: center;
     justify-content: center;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
 }
 .content {
     text-align: center;
@@ -98,4 +98,38 @@ label {
     border: 1px solid #ff0000;
     color: #ff0000;
     padding: .5rem 1rem;
+}
+.logs-area {
+    margin: 0 auto;
+    width: 90%;
+    background: linear-gradient(to bottom, rgba(43,237,230,0.1) 0%, rgba(43,237,230,0.2) 100%);
+    border: 1px solid #2bede6;
+    box-shadow: none;
+    color: #aafffc;
+    font-size: 15px;
+    outline: 0;
+    height: 10vh;
+    padding: .5rem 1rem;
+    display: block;
+    overflow: hidden;
+    border-radius: .25rem;
+    font-family: inherit;
+}
+button {
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+    margin-bottom: 1rem;
+    padding: .5rem 3rem;
+    text-transform: uppercase;
+    vertical-align: baseline;
+    background: linear-gradient(to bottom, rgba(43,237,230,0.1) 0%, rgba(43,237,230,0.2) 100%);
+    border-color: #2bede6;
+    color: #2bede6;
+    border-radius: 50px;
+    text-decoration: none;
+    display: inline-block;
+    font-weight: bold;
+    border: 1px solid #2bede6;
+    text-align: center;
+    font-family: inherit;
 }
