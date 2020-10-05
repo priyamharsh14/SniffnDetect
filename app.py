@@ -13,6 +13,7 @@ async def index():
 	return await render_template('homepage.html', config=[sniffer.INTERFACE.name, sniffer.MY_IP, sniffer.MY_MAC])
 
 async def WS_receiver():
+	global sniffer
 	while sniffer.WEBSOCKET is not None:
 		data = await sniffer.WEBSOCKET.receive()
 		if data == 'CMD::START':
@@ -31,6 +32,7 @@ async def WS_receiver():
 			await sniffer.WEBSOCKET.send('LOG::Invalid CMD')
 
 async def WS_sender():
+	global sniffer
 	while sniffer.WEBSOCKET is not None:
 		await sniffer.WEBSOCKET.send("\n".join([f"{pkt}" for pkt in sniffer.RECENT_ACTIVITIES[::-1]]))
 
@@ -48,6 +50,7 @@ async def ws():
 		await asyncio.gather(producer, consumer)
 	except asyncio.CancelledError:
 		sniffer.WEBSOCKET = None
+		sniffer.stop()
 		raise
 
 if not is_admin():

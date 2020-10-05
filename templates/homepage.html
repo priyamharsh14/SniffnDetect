@@ -32,7 +32,7 @@
         ws.onerror = function (event) {
             _startButton.setAttribute('disabled', 'disabled');
             _stopButton.setAttribute('disabled', 'disabled');
-            alert('Failed to connect to websocket !');
+            alert('WebSocket Connection Failed');
         };
         ws.onopen = function () {
             _startButton.onclick = function () {
