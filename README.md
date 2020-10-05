@@ -1,3 +1,2 @@
-<h1 align="center">SniffnDetect 2.0beta</h1>
-
+# SniffnDetect 2.0beta
 ## Under Construction
