@@ -1,26 +1,52 @@
 <html>
     <head>
-        <title>SnD</title>
+        <title>Sniff n Detect</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300i,700,700i" rel="stylesheet">
+        <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
     </head>
     <body>
-        <label>Interface</label>
-        <input type="text" value="{{ config.0 }}" disabled><br>
-        <label>Current IP</label>
-        <input type="text" value="{{ config.1 }}" disabled><br>
-        <label>Current MAC</label>
-        <input type="text" value="{{ config.2 }}" disabled><br>
+        <header>
+            <div class="header-box">
+                <h3 class="heading">Sniff n Detect 2.0</h3>
+            </div>
+        </header>
         <br>
-        <label>TCP SYN Flood</label>
-        <input type="text" value="{{ flags['TCP-SYN']['flag'] }}" id="TCP-SYN" disabled><br>
-        <label>TCP SYN-ACK Flood</label>
-        <input type="text" value="{{ flags['TCP-SYNACK']['flag'] }}" id="TCP-SYNACK" disabled><br>
-        <label>Ping of Death</label>
-        <input type="text" value="{{ flags['ICMP-POD']['flag'] }}" id="ICMP-POD" disabled><br>
-        <label>ICMP Smurf Attack</label>
-        <input type="text" value="{{ flags['ICMP-SMURF']['flag'] }}" id="ICMP-SMURF" disabled><br>
+        <div class="container">
+            <div class="content">
+                <label>Interface</label>
+                <input type="text" value="{{ config.0 }}" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>Current IP</label>
+                <input type="text" value="{{ config.1 }}" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>Current MAC</label>
+                <input type="text" value="{{ config.2 }}" class="input-text" disabled>
+            </div>
+        </div>
+        <div class="container">
+            <div class="content">
+                <label>TCP SYN Flood</label>
+                <input type="text" value="{{ flags['TCP-SYN']['flag'] }}" id="TCP-SYN" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>TCP SYN-ACK Flood</label>
+                <input type="text" value="{{ flags['TCP-SYNACK']['flag'] }}" id="TCP-SYNACK" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>Ping of Death</label>
+                <input type="text" value="{{ flags['ICMP-POD']['flag'] }}" id="ICMP-POD" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>ICMP Smurf Attack</label>
+                <input type="text" value="{{ flags['ICMP-SMURF']['flag'] }}" id="ICMP-SMURF" class="input-text" disabled>
+            </div>
+        </div>
         <br>
-        <textarea id="activities" style="width: 100%; height: 40vh;"></textarea>
-        <textarea id="logs" style="width: 100%; height: 20vh;"></textarea>
+        <textarea disabled id="activities" style="width: 100%; height: 40vh;"></textarea>
+        <textarea disabled id="logs" style="width: 100%; height: 20vh;"></textarea>
         <br><br>
         <button type="button" id="start-sniffer">START</button>
         <button type="button" id="stop-sniffer">STOP</button>
@@ -41,12 +67,36 @@
                 case 'FLAG:':
                     var data = String(event.data).slice(5).split(',');
                     var _temp = document.getElementById('TCP-SYN');
+                    if(data[0] == 'False'){
+                        _temp.setAttribute('class', 'input-text-green');
+                    }
+                    else {
+                        _temp.setAttribute('class', 'input-text-red');
+                    }
                     _temp.value = data[0];
                     _temp = document.getElementById('TCP-SYNACK');
+                    if(data[1] == 'False'){
+                        _temp.setAttribute('class', 'input-text-green');
+                    }
+                    else {
+                        _temp.setAttribute('class', 'input-text-red');
+                    }
                     _temp.value = data[1];
                     _temp = document.getElementById('ICMP-POD');
+                    if(data[2] == 'False'){
+                        _temp.setAttribute('class', 'input-text-green');
+                    }
+                    else {
+                        _temp.setAttribute('class', 'input-text-red');
+                    }
                     _temp.value = data[2];
                     _temp = document.getElementById('ICMP-SMURF');
+                    if(data[3] == 'False'){
+                        _temp.setAttribute('class', 'input-text-green');
+                    }
+                    else {
+                        _temp.setAttribute('class', 'input-text-red');
+                    }
                     _temp.value = data[3];
                     break;
                 default:
