@@ -10,7 +10,11 @@ sniffer = SniffnDetect()
 @app.route('/', methods=['GET'])
 async def index():
 	global sniffer
-	return await render_template('homepage.html', config=[sniffer.INTERFACE.name, sniffer.MY_IP, sniffer.MY_MAC])
+	return await render_template(
+		'homepage.html',
+		config=[sniffer.INTERFACE.name, sniffer.MY_IP, sniffer.MY_MAC],
+		flags=sniffer.FILTERED_ACTIVITIES
+	)
 
 async def WS_receiver():
 	global sniffer
@@ -18,10 +22,10 @@ async def WS_receiver():
 		data = await sniffer.WEBSOCKET.receive()
 		if data == 'CMD::START':
 			if sniffer.flag:
-				await sniffer.WEBSOCKET.send('LOG::Already Started')
+				await sniffer.WEBSOCKET.send('LOG::Already Running')
 			else:
-				sniffer.start()
 				await sniffer.WEBSOCKET.send(f'LOG::Started Sniffer @ {str(datetime.now()).split(".")[0]}')
+				sniffer.start()
 		elif data == 'CMD::STOP':
 			if sniffer.flag:
 				await sniffer.WEBSOCKET.send(f'LOG::Stopped Sniffer @ {str(datetime.now()).split(".")[0]}')
@@ -34,7 +38,9 @@ async def WS_receiver():
 async def WS_sender():
 	global sniffer
 	while sniffer.WEBSOCKET is not None:
-		await sniffer.WEBSOCKET.send("\n".join([f"{pkt}" for pkt in sniffer.RECENT_ACTIVITIES[::-1]]))
+		if sniffer.RECENT_ACTIVITIES:
+			await sniffer.WEBSOCKET.send("PKT::"+"\n".join([f"{pkt}" for pkt in sniffer.RECENT_ACTIVITIES[::-1]]))
+		await sniffer.WEBSOCKET.send(f"FLAG:{sniffer.FILTERED_ACTIVITIES['TCP-SYN']['flag']},{sniffer.FILTERED_ACTIVITIES['TCP-SYNACK']['flag']},{sniffer.FILTERED_ACTIVITIES['ICMP-POD']['flag']},{sniffer.FILTERED_ACTIVITIES['ICMP-SMURF']['flag']}")
 
 @app.websocket('/ws')
 async def ws():

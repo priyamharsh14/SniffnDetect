@@ -10,6 +10,15 @@
         <label>Current MAC</label>
         <input type="text" value="{{ config.2 }}" disabled><br>
         <br>
+        <label>TCP SYN Flood</label>
+        <input type="text" value="{{ flags['TCP-SYN']['flag'] }}" id="TCP-SYN" disabled><br>
+        <label>TCP SYN-ACK Flood</label>
+        <input type="text" value="{{ flags['TCP-SYNACK']['flag'] }}" id="TCP-SYNACK" disabled><br>
+        <label>Ping of Death</label>
+        <input type="text" value="{{ flags['ICMP-POD']['flag'] }}" id="ICMP-POD" disabled><br>
+        <label>ICMP Smurf Attack</label>
+        <input type="text" value="{{ flags['ICMP-SMURF']['flag'] }}" id="ICMP-SMURF" disabled><br>
+        <br>
         <textarea id="activities" style="width: 100%; height: 40vh;"></textarea>
         <textarea id="logs" style="width: 100%; height: 20vh;"></textarea>
         <br><br>
@@ -22,11 +31,26 @@
         var _startButton = document.getElementById('start-sniffer');
         var _stopButton = document.getElementById('stop-sniffer');
         ws.onmessage = function (event) {
-            if (String(event.data).slice(0,5) == 'LOG::') {
-                _element2.innerHTML += event.data + "\n";
-            }
-            else {
-                _element.innerHTML = event.data;
+            switch (String(event.data).slice(0,5)) {
+                case 'LOG::':
+                    _element2.innerHTML += event.data + "\n";
+                    break;
+                case 'PKT::':
+                    _element.innerHTML = String(event.data).slice(5);
+                    break;
+                case 'FLAG:':
+                    var data = String(event.data).slice(5).split(',');
+                    var _temp = document.getElementById('TCP-SYN');
+                    _temp.value = data[0];
+                    _temp = document.getElementById('TCP-SYNACK');
+                    _temp.value = data[1];
+                    _temp = document.getElementById('ICMP-POD');
+                    _temp.value = data[2];
+                    _temp = document.getElementById('ICMP-SMURF');
+                    _temp.value = data[3];
+                    break;
+                default:
+                    console.log(event.data);
             }
         };
         ws.onerror = function (event) {
