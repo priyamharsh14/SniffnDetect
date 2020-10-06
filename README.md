@@ -1,4 +1,4 @@
-<h1 align="center">SniffnDetect</h1>
+<h1 align="center">SniffnDetect 2.0</h1>
 
 ## What is SniffnDetect 2.0 ?
 
@@ -31,9 +31,3 @@ NOTE: Script must run in root (in Linux) or Administrator (in Windows)
 /SniffnDetect/$ sudo python3 start.py
 ```
 This will start the web interface at your local port 5000. Now, you can simply fire up your browser and go to 127.0.0.1:5000 to access it.
-
-## Donate
-
-If you feel this project was awesome, you can give me a cup of coffee :)
-
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.me/priyamharsh14)
