@@ -1,16 +1,21 @@
-<h1 align="center">SniffnDetect</h1>
+<h1 align="center">SniffnDetect 2.0</h1>
 
-## What is SniffnDetect ?
+## What is SniffnDetect 2.0 ?
 
-SniffnDetect is an advance DDOS detector tool written completely on Python3. It will sniff your network for a certain amount of time and identify attacks like:
+SniffnDetect 2.0 is an advanced DDOS detector tool written in Python3. It will sniff all the traffic in your network and identify attacks like:
 
 - SYN Flood Attack
 - SYN-ACK Flood Attack
 - ICMP Smurf Attack
 - Ping of Death
-- and many more to come..
 
-After detecting those attack packets, SniffnDetect will also find the source of the attack and provide the details of attacker(s).
+After detecting those attack(s), it will also try to find the source of the attack and provide the details of the attacker(s). This version of SniffnDetect has been heavily optimized and by utilizing threads, Quart framework, and WebSockets, it also provides a beautiful Web User Interface for the user.
+
+## Upcoming Features
+
+- More attack detection algorithms
+- Defense mechanisms to counteract DDOS attacks (LINUX only)
+- Better animations and transitions in Web UI
 
 ## Installation
 ```
@@ -22,13 +27,7 @@ $ cd SniffnDetect
 ## Usage
 
 NOTE: Script must run in root (in Linux) or Administrator (in Windows)
-
 ```
 /SniffnDetect/$ sudo python3 start.py
 ```
-
-## Donate
-
-If you feel this project was awesome, you can give me a cup of coffee :)
-
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.me/priyamharsh14)
+This will start the web interface at your local port 5000. Now, you can simply fire up your browser and go to 127.0.0.1:5000 to access it.

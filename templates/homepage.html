@@ -1,0 +1,172 @@
+<html>
+    <head>
+        <title>SnD 2.0</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300i,700,700i" rel="stylesheet">
+        <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/typeit@7.0.4/dist/typeit.min.js"></script>
+    </head>
+    <body>
+        <header>
+            <div class="header-box">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <h3 class="heading" id="heading">SNIFF n DETECT 2.0</h3>
+                <div class="container">
+                    <button type="button" id="start-sniffer">START</button>
+                    <button type="button" id="find-attackers">FIND ATTACKERS</button>
+                    <button type="button" id="toggle-info">TOGGLE INFO</button>
+                    <button type="button" id="stop-sniffer">STOP</button>
+                </div>
+            </div>
+        </header>
+        <div class="modal" id="attackers-modal">
+            <div class="modal-content">
+                <span id="close-modal" class="close">&times;</span>
+                <h3 align="center">FIND ATTACKERS</h3>
+                <hr>
+                <div style="margin: 0 auto; height: 80%; overflow: auto;">
+                    <p id="modal-logs"></p>
+                </div>
+            </div>
+        </div>
+        <br>
+        <div class="container" id="info" style="display: none;">
+            <div class="content">
+                <label>Interface</label>
+                <input type="text" value="{{ config.0 }}" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>Current IP</label>
+                <input type="text" value="{{ config.1 }}" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>Current MAC</label>
+                <input type="text" value="{{ config.2 }}" class="input-text" disabled>
+            </div>
+        </div>
+        <div class="container">
+            <div class="content">
+                <label>TCP SYN Flood</label>
+                <input type="text" value="{{ flags['TCP-SYN']['flag'] }}" id="TCP-SYN" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>TCP SYN-ACK Flood</label>
+                <input type="text" value="{{ flags['TCP-SYNACK']['flag'] }}" id="TCP-SYNACK" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>Ping of Death</label>
+                <input type="text" value="{{ flags['ICMP-POD']['flag'] }}" id="ICMP-POD" class="input-text" disabled>
+            </div>
+            <div class="content">
+                <label>ICMP Smurf Attack</label>
+                <input type="text" value="{{ flags['ICMP-SMURF']['flag'] }}" id="ICMP-SMURF" class="input-text" disabled>
+            </div>
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+            <label style="margin-left: 5%;">TERMINAL LOGS</label>
+            <textarea disabled id="logs" class="logs-area"></textarea>
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+            <label style="margin-left: 5%;">NETWORK ACTIVITIES</label>
+            <textarea disabled id="activities" style="height: 30vh;" class="logs-area"></textarea>
+        </div>
+        <script type="text/javascript">
+        var ws = new WebSocket('ws://' + document.domain + ':' + location.port + '/ws');
+        var _element = document.getElementById('activities');
+        var _element2 = document.getElementById('logs');
+        var _element3 = document.getElementById('attackers-modal');
+        var _element4 = document.getElementById('close-modal');
+        var _startButton = document.getElementById('start-sniffer');
+        var _stopButton = document.getElementById('stop-sniffer');
+        var _fattackers = document.getElementById('find-attackers');
+        document.getElementById('toggle-info').onclick = function () {
+            var _temp = document.getElementById('info');
+            if (_temp.hasAttribute('style')) {
+                _temp.removeAttribute('style');
+            }
+            else {
+                _temp.setAttribute('style', 'display: none;');
+            }
+        };
+        ws.onmessage = function (event) {
+            switch (String(event.data).slice(0,5)) {
+                case 'LOG::':
+                    _element2.scrollTop = _element2.scrollHeight;
+                    new TypeIt("#logs", {
+                        speed: 10,
+                        waitUntilVisible: true
+                    }).type(event.data + "\n").go();
+                    break;
+                case 'PKT::':
+                    _element.innerHTML = String(event.data).slice(5);
+                    break;
+                case 'FA0::':
+                    document.getElementById('modal-logs').innerHTML += String(event.data).slice(5);
+                    break;
+                case 'FLAG:':
+                    var data = String(event.data).slice(5).split(',');
+                    var _temp = document.getElementById('TCP-SYN');
+                    if(data[0] == 'False'){
+                        _temp.setAttribute('class', 'input-text green-field');
+                    }
+                    else {
+                        _temp.setAttribute('class', 'input-text red-field');
+                    }
+                    _temp.value = data[0];
+                    _temp = document.getElementById('TCP-SYNACK');
+                    if(data[1] == 'False'){
+                        _temp.setAttribute('class', 'input-text green-field');
+                    }
+                    else {
+                        _temp.setAttribute('class', 'input-text red-field');
+                    }
+                    _temp.value = data[1];
+                    _temp = document.getElementById('ICMP-POD');
+                    if(data[2] == 'False'){
+                        _temp.setAttribute('class', 'input-text green-field');
+                    }
+                    else {
+                        _temp.setAttribute('class', 'input-text red-field');
+                    }
+                    _temp.value = data[2];
+                    _temp = document.getElementById('ICMP-SMURF');
+                    if(data[3] == 'False'){
+                        _temp.setAttribute('class', 'input-text green-field');
+                    }
+                    else {
+                        _temp.setAttribute('class', 'input-text red-field');
+                    }
+                    _temp.value = data[3];
+                    break;
+                default:
+                    console.log(event.data);
+            }
+        };
+        ws.onerror = function (event) {
+            _startButton.setAttribute('disabled', 'disabled');
+            _stopButton.setAttribute('disabled', 'disabled');
+            _fattackers.setAttribute('disabled', 'disabled');
+            alert('WebSocket Connection Failed');
+        };
+        ws.onopen = function () {
+            _startButton.onclick = function () {
+                ws.send('CMD::START');
+            };
+            _stopButton.onclick = function () {
+                ws.send('CMD::STOP');
+            };
+            _fattackers.onclick = function () {
+                ws.send('CMD::FATTACKERS');
+                document.getElementById('modal-logs').innerHTML = '';
+                _element3.style.display = "block";
+            };
+            _element4.onclick = function () {
+                _element3.style.display = "none";
+            };
+        };
+        </script>
+    </body>
+</html>
