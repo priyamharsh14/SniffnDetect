@@ -28,6 +28,6 @@ $ cd SniffnDetect
 
 NOTE: Script must run in root (in Linux) or Administrator (in Windows)
 ```
-/SniffnDetect/$ sudo python3 start.py
+/SniffnDetect/$ sudo python3 app.py
 ```
 This will start the web interface at your local port 5000. Now, you can simply fire up your browser and go to 127.0.0.1:5000 to access it.
