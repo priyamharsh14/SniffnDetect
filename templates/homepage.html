@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>Sniff n Detect</title>
+        <title>SnD 2.0</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link href="https://fonts.googleapis.com/css?family=Titillium+Web:300,300i,700,700i" rel="stylesheet">
         <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
@@ -9,9 +9,29 @@
     <body>
         <header>
             <div class="header-box">
-                <h3 class="heading">Sniff n Detect 2.0</h3>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <h3 class="heading" id="heading">SNIFF n DETECT 2.0</h3>
+                <div class="container">
+                    <button type="button" id="start-sniffer">START</button>
+                    <button type="button" id="find-attackers">FIND ATTACKERS</button>
+                    <button type="button" id="toggle-info">TOGGLE INFO</button>
+                    <button type="button" id="stop-sniffer">STOP</button>
+                </div>
             </div>
         </header>
+        <div class="modal" id="attackers-modal">
+            <div class="modal-content">
+                <span id="close-modal" class="close">&times;</span>
+                <h3 align="center">FIND ATTACKERS</h3>
+                <hr>
+                <div style="margin: 0 auto; height: 80%; overflow: auto;">
+                    <p id="modal-logs"></p>
+                </div>
+            </div>
+        </div>
         <br>
         <div class="container" id="info" style="display: none;">
             <div class="content">
@@ -53,23 +73,22 @@
             <label style="margin-left: 5%;">NETWORK ACTIVITIES</label>
             <textarea disabled id="activities" style="height: 30vh;" class="logs-area"></textarea>
         </div>
-        <div class="container">
-            <button type="button" id="start-sniffer">START</button>
-            <button type="button" id="stop-sniffer">STOP</button>
-            <button type="button" id="toggle-info">TOGGLE INFO</button>
-        </div>
         <script type="text/javascript">
         var ws = new WebSocket('ws://' + document.domain + ':' + location.port + '/ws');
         var _element = document.getElementById('activities');
         var _element2 = document.getElementById('logs');
+        var _element3 = document.getElementById('attackers-modal');
+        var _element4 = document.getElementById('close-modal');
         var _startButton = document.getElementById('start-sniffer');
         var _stopButton = document.getElementById('stop-sniffer');
+        var _fattackers = document.getElementById('find-attackers');
         document.getElementById('toggle-info').onclick = function () {
             var _temp = document.getElementById('info');
-            if (_temp.style.display === "none") {
-                _temp.style.display = "flex";
-            } else {
-                _temp.style.display = "none";
+            if (_temp.hasAttribute('style')) {
+                _temp.removeAttribute('style');
+            }
+            else {
+                _temp.setAttribute('style', 'display: none;');
             }
         };
         ws.onmessage = function (event) {
@@ -84,38 +103,41 @@
                 case 'PKT::':
                     _element.innerHTML = String(event.data).slice(5);
                     break;
+                case 'FA0::':
+                    document.getElementById('modal-logs').innerHTML += String(event.data).slice(5);
+                    break;
                 case 'FLAG:':
                     var data = String(event.data).slice(5).split(',');
                     var _temp = document.getElementById('TCP-SYN');
                     if(data[0] == 'False'){
-                        _temp.setAttribute('class', 'input-text-green');
+                        _temp.setAttribute('class', 'input-text green-field');
                     }
                     else {
-                        _temp.setAttribute('class', 'input-text-red');
+                        _temp.setAttribute('class', 'input-text red-field');
                     }
                     _temp.value = data[0];
                     _temp = document.getElementById('TCP-SYNACK');
                     if(data[1] == 'False'){
-                        _temp.setAttribute('class', 'input-text-green');
+                        _temp.setAttribute('class', 'input-text green-field');
                     }
                     else {
-                        _temp.setAttribute('class', 'input-text-red');
+                        _temp.setAttribute('class', 'input-text red-field');
                     }
                     _temp.value = data[1];
                     _temp = document.getElementById('ICMP-POD');
                     if(data[2] == 'False'){
-                        _temp.setAttribute('class', 'input-text-green');
+                        _temp.setAttribute('class', 'input-text green-field');
                     }
                     else {
-                        _temp.setAttribute('class', 'input-text-red');
+                        _temp.setAttribute('class', 'input-text red-field');
                     }
                     _temp.value = data[2];
                     _temp = document.getElementById('ICMP-SMURF');
                     if(data[3] == 'False'){
-                        _temp.setAttribute('class', 'input-text-green');
+                        _temp.setAttribute('class', 'input-text green-field');
                     }
                     else {
-                        _temp.setAttribute('class', 'input-text-red');
+                        _temp.setAttribute('class', 'input-text red-field');
                     }
                     _temp.value = data[3];
                     break;
@@ -126,6 +148,7 @@
         ws.onerror = function (event) {
             _startButton.setAttribute('disabled', 'disabled');
             _stopButton.setAttribute('disabled', 'disabled');
+            _fattackers.setAttribute('disabled', 'disabled');
             alert('WebSocket Connection Failed');
         };
         ws.onopen = function () {
@@ -134,6 +157,14 @@
             };
             _stopButton.onclick = function () {
                 ws.send('CMD::STOP');
+            };
+            _fattackers.onclick = function () {
+                ws.send('CMD::FATTACKERS');
+                document.getElementById('modal-logs').innerHTML = '';
+                _element3.style.display = "block";
+            };
+            _element4.onclick = function () {
+                _element3.style.display = "none";
             };
         };
         </script>

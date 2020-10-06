@@ -32,6 +32,11 @@ async def WS_receiver():
 				sniffer.stop()
 			else:
 				await sniffer.WEBSOCKET.send('LOG::Already Stopped')
+		elif data == 'CMD::FATTACKERS':
+			if any([sniffer.FILTERED_ACTIVITIES[category]['flag'] for category in sniffer.FILTERED_ACTIVITIES]):
+				await sniffer.WEBSOCKET.send(f"FA0::{sniffer.find_attackers('TCP-SYN')}{sniffer.find_attackers('TCP-SYNACK')}{sniffer.find_attackers('ICMP-POD')}{sniffer.find_attackers('ICMP-SMURF')}")
+			else:
+				await sniffer.WEBSOCKET.send('FA0::No DDOS attack detected yet. Try again later.')
 		else:
 			await sniffer.WEBSOCKET.send('LOG::Invalid CMD')
 
@@ -39,7 +44,15 @@ async def WS_sender():
 	global sniffer
 	while sniffer.WEBSOCKET is not None:
 		if sniffer.RECENT_ACTIVITIES:
-			await sniffer.WEBSOCKET.send("PKT::"+"\n".join([f"{pkt}" for pkt in sniffer.RECENT_ACTIVITIES[::-1]]))
+			data = []
+			for pkt in sniffer.RECENT_ACTIVITIES[::-1]:
+				msg = f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(pkt[0]))} <{'|'.join(pkt[1])}> {pkt[2]}:{pkt[6]} ({pkt[4]}) => {pkt[3]}:{pkt[7]} ({pkt[5]})"
+				if pkt[8]:
+					msg += f" [{pkt[8]} bytes]"
+				if pkt[9]:
+					msg += f" <{pkt[9]}>"
+				data.append(msg)
+			await sniffer.WEBSOCKET.send("PKT::"+"\n".join(data))
 		await sniffer.WEBSOCKET.send(f"FLAG:{sniffer.FILTERED_ACTIVITIES['TCP-SYN']['flag']},{sniffer.FILTERED_ACTIVITIES['TCP-SYNACK']['flag']},{sniffer.FILTERED_ACTIVITIES['ICMP-POD']['flag']},{sniffer.FILTERED_ACTIVITIES['ICMP-SMURF']['flag']}")
 
 @app.websocket('/ws')

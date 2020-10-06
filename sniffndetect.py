@@ -48,11 +48,11 @@ class SniffnDetect():
 		time /= len(activities)
 		return ( time<2 and self.RECENT_ACTIVITIES[-1][0] - activities[-1][0] < 10)
 
-	def find_attackers(self, mac_data):
-		msg = []
-		for mac in mac_data:
-			msg.append("["+str(self.MAC_TABLE[mac])+" ("+mac+")]" if mac in self.MAC_TABLE else "[Unknown IP ("+mac+")]")
-		return " ".join(msg)
+	def find_attackers(self, category):
+		data = []
+		for mac in self.FILTERED_ACTIVITIES[category]['attacker-mac']:
+			data.append(f"({self.MAC_TABLE[mac]}, {mac})" if mac in self.MAC_TABLE else f"(Unknown IP, {mac})")
+		return category + ' Attackers :<br>' + "<br>".join(data) + '<br><br>'
 	
 	def set_flags(self):
 		for category in self.FILTERED_ACTIVITIES:
@@ -113,7 +113,7 @@ class SniffnDetect():
 				self.FILTERED_ACTIVITIES['ICMP-SMURF']['activities'].append([pkt.time,])
 				attack_type = 'ICMP-SMURF PACKET'
 
-			if load_len>1024:
+			if load_len and load_len>1024:
 				self.FILTERED_ACTIVITIES['ICMP-POD']['activities'].append([pkt.time,])
 				attack_type = 'ICMP-PoD PACKET'
 
