@@ -13,8 +13,8 @@ SniffnDetect v.1.1
 class SniffnDetect():
 	def __init__(self):
 		self.INTERFACE = conf.iface
-		self.MY_IP = self.INTERFACE.ip
-		self.MY_MAC = self.INTERFACE.mac
+		self.MY_IP = [x[4] for x in conf.route.routes if x[2] != '0.0.0.0' and x[3]==self.INTERFACE][0]
+		self.MY_MAC = get_if_hwaddr(self.INTERFACE)
 		self.WEBSOCKET = None
 		self.PACKETS_QUEUE = Queue()
 		self.MAC_TABLE = {}
