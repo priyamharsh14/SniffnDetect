@@ -12,7 +12,7 @@ async def index():
 	global sniffer
 	return await render_template(
 		'homepage.html',
-		config=[sniffer.INTERFACE.name, sniffer.MY_IP, sniffer.MY_MAC],
+		config=[sniffer.INTERFACE, sniffer.MY_IP, sniffer.MY_MAC],
 		flags=sniffer.FILTERED_ACTIVITIES
 	)
 
